@@ -18,7 +18,11 @@ import Foundation
 /// reducing stage.
 ///
 /// **Notify** is calling user callbacks, in case of database change or error.
-final class ValueWriteOnlyObserver<Writer: DatabaseWriter, Reducer: ValueReducer, Scheduler: ValueObservationScheduler> {
+final class ValueWriteOnlyObserver<
+    Writer: DatabaseWriter,
+    Reducer: ValueReducer,
+    Scheduler: ValueObservationScheduler>
+{
     // MARK: - Configuration
     //
     // Configuration is not mutable.
@@ -341,6 +345,13 @@ extension ValueWriteOnlyObserver: TransactionObserver {
         }
     }
     
+    func databaseDidChange() {
+        // Database was modified!
+        observationState.isModified = true
+        // We can stop observing the current transaction
+        stopObservingDatabaseChangesUntilNextTransaction()
+    }
+    
     func databaseDidChange(with event: DatabaseEvent) {
         if let region = observationState.region, region.isModified(by: event) {
             // Database was modified!
@@ -403,7 +414,7 @@ extension ValueWriteOnlyObserver: TransactionObserver {
                     let value = try self.reducer._value(fetchedValue)
                     
                     // Notify value
-                    if let value = value {
+                    if let value {
                         self.scheduler.schedule {
                             let onChange = self.lock.synchronized { self.notificationCallbacks?.onChange }
                             guard let onChange else { return /* Cancelled */ }

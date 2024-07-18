@@ -80,7 +80,8 @@ import Foundation
 /// - ``joining(optional:)``
 /// - ``joining(required:)``
 /// - ``limit(_:offset:)``
-/// - ``matching(_:)``
+/// - ``matching(_:)-22m4o``
+/// - ``matching(_:)-1t8ph``
 /// - ``none()``
 /// - ``order(_:)-9rc11``
 /// - ``order(_:)-2033k``
@@ -132,12 +133,15 @@ public protocol TableRecord {
     ///
     /// ```swift
     /// struct Player: TableRecord {
-    ///     static let databaseSelection = [AllColumns()]
+    ///     static let databaseSelection: [any SQLSelectable] = [AllColumns()]
     /// }
     ///
     /// struct PartialPlayer: TableRecord {
     ///     static let databaseTableName = "player"
-    ///     static let databaseSelection = [Column("id"), Column("name")]
+    ///     static let databaseSelection: [any SQLSelectable] = [
+    ///         Column("id"),
+    ///         Column("name"),
+    ///     ]
     /// }
     ///
     /// // SELECT * FROM player
@@ -146,6 +150,11 @@ public protocol TableRecord {
     /// // SELECT id, name FROM player
     /// try PartialPlayer.fetchAll(db)
     /// ```
+    ///
+    /// > Important: Make sure the `databaseSelection` property is
+    /// > explicitly declared as `[any SQLSelectable]`. If it is not, the
+    /// > Swift compiler may silently miss the protocol requirement,
+    /// > resulting in sticky `SELECT *` requests.
     static var databaseSelection: [any SQLSelectable] { get }
 }
 
@@ -309,7 +318,7 @@ extension TableRecord {
     }
 }
 
-@available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension TableRecord where Self: Identifiable, ID: DatabaseValueConvertible {
     /// Returns whether a record exists for this primary key.
     ///
@@ -445,7 +454,7 @@ extension TableRecord {
     }
 }
 
-@available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension TableRecord where Self: Identifiable, ID: DatabaseValueConvertible {
     /// Deletes records identified by their primary keys, and returns the number
     /// of deleted records.
@@ -660,6 +669,31 @@ extension TableRecord {
 // MARK: - RecordError
 
 /// A record error.
+///
+/// `RecordError` is thrown by ``MutablePersistableRecord`` types when an
+/// `update` method could not find any row to update:
+///
+/// ```swift
+/// do {
+///     try player.update(db)
+/// } catch let RecordError.recordNotFound(databaseTableName: table, key: key) {
+///     print("Key \(key) was not found in table \(table).")
+/// }
+/// ```
+///
+/// `RecordError` is also thrown by ``FetchableRecord`` types when a
+/// `find` method does not find any record:
+///
+/// ```swift
+/// do {
+///     let player = try Player.find(db, id: 42)
+/// } catch let RecordError.recordNotFound(databaseTableName: table, key: key) {
+///     print("Key \(key) was not found in table \(table).")
+/// }
+/// ```
+///
+/// You can create `RecordError` instances with the
+/// ``TableRecord/recordNotFound(_:id:)`` method and its variants.
 public enum RecordError: Error {
     /// A record does not exist in the database.
     ///
@@ -700,20 +734,20 @@ extension TableRecord {
     
     /// Returns an error for a record that does not exist in the database.
     public static func recordNotFound(key: [String: (any DatabaseValueConvertible)?]) -> RecordError {
-        return RecordError.recordNotFound(
+        RecordError.recordNotFound(
             databaseTableName: databaseTableName,
             key: key.mapValues { $0?.databaseValue ?? .null })
     }
 }
 
-@available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension TableRecord where Self: Identifiable, ID: DatabaseValueConvertible {
     /// Returns an error for a record that does not exist in the database.
     ///
     /// - returns: ``RecordError/recordNotFound(databaseTableName:key:)``, or
     ///   any error that prevented the `RecordError` from being constructed.
     public static func recordNotFound(_ db: Database, id: Self.ID) -> any Error {
-        return recordNotFound(db, key: id)
+        recordNotFound(db, key: id)
     }
 }
 

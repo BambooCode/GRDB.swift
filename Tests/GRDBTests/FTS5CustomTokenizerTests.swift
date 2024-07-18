@@ -6,7 +6,7 @@ import GRDB
 // A custom tokenizer that ignores some tokens
 private final class StopWordsTokenizer : FTS5CustomTokenizer {
     static let name = "stopWords"
-    let wrappedTokenizer: FTS5Tokenizer
+    let wrappedTokenizer: any FTS5Tokenizer
     let ignoredTokens: [String]
     
     init(db: Database, arguments: [String]) throws {
@@ -23,7 +23,7 @@ private final class StopWordsTokenizer : FTS5CustomTokenizer {
         // TODO: test that deinit is called
     }
     
-    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<Int8>?, nText: Int32, tokenCallback: @escaping FTS5TokenCallback) -> Int32 {
+    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<CChar>?, nText: Int32, tokenCallback: @escaping FTS5TokenCallback) -> Int32 {
         
         // The way we implement stop words is by letting wrappedTokenizer do its
         // job but intercepting its tokens before they feed SQLite.
@@ -62,7 +62,7 @@ private final class StopWordsTokenizer : FTS5CustomTokenizer {
 // A custom tokenizer that converts tokens to NFKC so that "fi" can match "ﬁ" (U+FB01: LATIN SMALL LIGATURE FI)
 private final class NFKCTokenizer : FTS5CustomTokenizer {
     static let name = "nfkc"
-    let wrappedTokenizer: FTS5Tokenizer
+    let wrappedTokenizer: any FTS5Tokenizer
     
     init(db: Database, arguments: [String]) throws {
         if arguments.isEmpty {
@@ -76,7 +76,7 @@ private final class NFKCTokenizer : FTS5CustomTokenizer {
         // TODO: test that deinit is called
     }
     
-    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<Int8>?, nText: Int32, tokenCallback: @escaping FTS5TokenCallback) -> Int32 {
+    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<CChar>?, nText: Int32, tokenCallback: @escaping FTS5TokenCallback) -> Int32 {
         
         // The way we implement NFKC conversion is by letting wrappedTokenizer
         // do its job, but intercepting its tokens before they feed SQLite.
@@ -107,7 +107,7 @@ private final class NFKCTokenizer : FTS5CustomTokenizer {
                     guard let addr = buffer.baseAddress else {
                         return 0 // SQLITE_OK
                     }
-                    let pToken = UnsafeMutableRawPointer(mutating: addr).assumingMemoryBound(to: Int8.self)
+                    let pToken = UnsafeMutableRawPointer(mutating: addr).assumingMemoryBound(to: CChar.self)
                     let nToken = Int32(buffer.count)
                     return customContext.tokenCallback(customContext.context, flags, pToken, nToken, iStart, iEnd)
                 }
@@ -119,7 +119,7 @@ private final class NFKCTokenizer : FTS5CustomTokenizer {
 // A custom tokenizer that defines synonyms
 private final class SynonymsTokenizer : FTS5CustomTokenizer {
     static let name = "synonyms"
-    let wrappedTokenizer: FTS5Tokenizer
+    let wrappedTokenizer: any FTS5Tokenizer
     let synonyms: [Set<String>]
     
     init(db: Database, arguments: [String]) throws {
@@ -135,7 +135,7 @@ private final class SynonymsTokenizer : FTS5CustomTokenizer {
         // TODO: test that deinit is called
     }
     
-    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<Int8>?, nText: Int32, tokenCallback: @escaping FTS5TokenCallback) -> Int32 {
+    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<CChar>?, nText: Int32, tokenCallback: @escaping FTS5TokenCallback) -> Int32 {
         // Don't look for synonyms when tokenizing queries, as advised by
         // https://www.sqlite.org/fts5.html#synonym_support
         if tokenization.contains(.query) {
@@ -176,7 +176,7 @@ private final class SynonymsTokenizer : FTS5CustomTokenizer {
                         guard let addr = buffer.baseAddress else {
                             return 0 // SQLITE_OK
                         }
-                        let pToken = UnsafeMutableRawPointer(mutating: addr).assumingMemoryBound(to: Int8.self)
+                        let pToken = UnsafeMutableRawPointer(mutating: addr).assumingMemoryBound(to: CChar.self)
                         let nToken = Int32(buffer.count)
                         // Set FTS5_TOKEN_COLOCATED for all but first token
                         let synonymFlags = (index == 0) ? flags : flags | 1 // 1: FTS5_TOKEN_COLOCATED

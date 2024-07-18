@@ -7,22 +7,43 @@ GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: 
 
 #### 6.x Releases
 
-- `6.6.x` Releases - [6.6.0](#660)
+- `6.27.x` Releases - [6.27.0](#6270)
+- `6.26.x` Releases - [6.26.0](#6260)
+- `6.25.x` Releases - [6.25.0](#6250)
+- `6.24.x` Releases - [6.24.0](#6240) - [6.24.1](#6241) - [6.24.2](#6242)
+- `6.23.x` Releases - [6.23.0](#6230)
+- `6.22.x` Releases - [6.22.0](#6220)
+- `6.21.x` Releases - [6.21.0](#6210)
+- `6.20.x` Releases - [6.20.0](#6200) - [6.20.1](#6201) - [6.20.2](#6202)
+- `6.19.x` Releases - [6.19.0](#6190)
+- `6.18.x` Releases - [6.18.0](#6180)
+- `6.17.x` Releases - [6.17.0](#6170)
+- `6.16.x` Releases - [6.16.0](#6160)
+- `6.15.x` Releases - [6.15.0](#6150) - [6.15.1](#6151)
+- `6.14.x` Releases - [6.14.0](#6140)
+- `6.13.x` Releases - [6.13.0](#6130)
+- `6.12.x` Releases - [6.12.0](#6120)
+- `6.11.x` Releases - [6.11.0](#6110)
+- `6.10.x` Releases - [6.10.0](#6100) - [6.10.1](#6101) - [6.10.2](#6102)
+- `6.9.x` Releases - [6.9.0](#690) - [6.9.1](#691) - [6.9.2](#692)
+- `6.8.x` Releases - [6.8.0](#680)
+- `6.7.x` Releases - [6.7.0](#670)
+- `6.6.x` Releases - [6.6.0](#660) - [6.6.1](#661)
 - `6.5.x` Releases - [6.5.0](#650)
 - `6.4.x` Releases - [6.4.0](#640)
 - `6.3.x` Releases - [6.3.0](#630) - [6.3.1](#631)
 - `6.2.x` Releases - [6.2.0](#620)
 - `6.1.x` Releases - [6.1.0](#610)
 - `6.0.x` Releases - [6.0.0](#600)
-- `6.0.0` Betas - [6.0.0-beta](#600-beta) | [6.0.0-beta.2](#600-beta2) | [6.0.0-beta.3](#600-beta3) | [6.0.0-beta.4](#600-beta4)
+- `6.0.0` Betas - [6.0.0-beta](#600-beta) - [6.0.0-beta.2](#600-beta2) - [6.0.0-beta.3](#600-beta3) - [6.0.0-beta.4](#600-beta4)
 
 #### 5.x Releases
 
 - `5.26.x` Releases - [5.26.0](#5260) - [5.26.1](#5261)
 - `5.25.x` Releases - [5.25.0](#5250)
-- `5.24.x` Releases - [5.24.0](#5240) | [5.24.1](#5241)
+- `5.24.x` Releases - [5.24.0](#5240) - [5.24.1](#5241)
 - `5.23.x` Releases - [5.23.0](#5230)
-- `5.22.x` Releases - [5.22.0](#5220) | [5.22.1](#5221) | [5.22.2](#5222)
+- `5.22.x` Releases - [5.22.0](#5220) - [5.22.1](#5221) - [5.22.2](#5222)
 - `5.21.x` Releases - [5.21.0](#5210)
 - `5.20.x` Releases - [5.20.0](#5200)
 - `5.19.x` Releases - [5.19.0](#5190)
@@ -37,41 +58,41 @@ GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: 
 - `5.10.x` Releases - [5.10.0](#5100)
 - `5.9.x` Releases - [5.9.0](#590)
 - `5.8.x` Releases - [5.8.0](#580)
-- `5.7.x` Releases - [5.7.0](#570) | [5.7.1](#571) | [5.7.2](#572) | [5.7.3](#573) | [5.7.4](#574)
+- `5.7.x` Releases - [5.7.0](#570) - [5.7.1](#571) - [5.7.2](#572) - [5.7.3](#573) - [5.7.4](#574)
 - `5.6.x` Releases - [5.6.0](#560)
 - `5.5.x` Releases - [5.5.0](#550)
 - `5.4.x` Releases - [5.4.0](#540)
 - `5.3.x` Releases - [5.3.0](#530)
 - `5.2.x` Releases - [5.2.0](#520)
 - `5.1.x` Releases - [5.1.0](#510)
-- `5.0.x` Releases - [5.0.0](#500) | [5.0.1](#501) | [5.0.2](#502) | [5.0.3](#503)
-- `5.0.0` Betas - [5.0.0-beta](#500-beta) | [5.0.0-beta.2](#500-beta2) | [5.0.0-beta.3](#500-beta3) | [5.0.0-beta.4](#500-beta4) | [5.0.0-beta.5](#500-beta5) | [5.0.0-beta.6](#500-beta6) | [5.0.0-beta.7](#500-beta7) | [5.0.0-beta.8](#500-beta8) | [5.0.0-beta.9](#500-beta9) | [5.0.0-beta.10](#500-beta10) | [5.0.0-beta.11](#500-beta11)
+- `5.0.x` Releases - [5.0.0](#500) - [5.0.1](#501) - [5.0.2](#502) - [5.0.3](#503)
+- `5.0.0` Betas - [5.0.0-beta](#500-beta) - [5.0.0-beta.2](#500-beta2) - [5.0.0-beta.3](#500-beta3) - [5.0.0-beta.4](#500-beta4) - [5.0.0-beta.5](#500-beta5) - [5.0.0-beta.6](#500-beta6) - [5.0.0-beta.7](#500-beta7) - [5.0.0-beta.8](#500-beta8) - [5.0.0-beta.9](#500-beta9) - [5.0.0-beta.10](#500-beta10) - [5.0.0-beta.11](#500-beta11)
 
 #### 4.x Releases
 
 - `4.14.x` Releases - [4.14.0](#4140)
 - `4.13.x` Releases - [4.13.0](#4130)
-- `4.12.x` Releases - [4.12.0](#4120) | [4.12.1](#4121) | [4.12.2](#4122)
+- `4.12.x` Releases - [4.12.0](#4120) - [4.12.1](#4121) - [4.12.2](#4122)
 - `4.11.x` Releases - [4.11.0](#4110)
 - `4.10.x` Releases - [4.10.0](#4100)
 - `4.9.x` Releases - [4.9.0](#490)
-- `4.8.x` Releases - [4.8.0](#480) | [4.8.1](#481)
+- `4.8.x` Releases - [4.8.0](#480) - [4.8.1](#481)
 - `4.7.x` Releases - [4.7.0](#470)
-- `4.6.x` Releases - [4.6.0](#460) | [4.6.1](#461) | [4.6.2](#462)
+- `4.6.x` Releases - [4.6.0](#460) - [4.6.1](#461) - [4.6.2](#462)
 - `4.5.x` Releases - [4.5.0](#450)
 - `4.4.x` Releases - [4.4.0](#440)
 - `4.3.x` Releases - [4.3.0](#430)
-- `4.2.x` Releases - [4.2.0](#420) | [4.2.1](#421)
-- `4.1.x` Releases - [4.1.0](#410) | [4.1.1](#411)
-- `4.0.x` Releases - [4.0.0](#400) | [4.0.1](#401)
+- `4.2.x` Releases - [4.2.0](#420) - [4.2.1](#421)
+- `4.1.x` Releases - [4.1.0](#410) - [4.1.1](#411)
+- `4.0.x` Releases - [4.0.0](#400) - [4.0.1](#401)
 
 #### 3.x Releases
 
 - `3.7.x` Releases - [3.7.0](#370)
-- `3.6.x` Releases - [3.6.0](#360) | [3.6.1](#361) | [3.6.2](#362)
+- `3.6.x` Releases - [3.6.0](#360) - [3.6.1](#361) - [3.6.2](#362)
 - `3.5.x` Releases - [3.5.0](#350)
 - `3.4.x` Releases - [3.4.0](#340)
-- `3.3.x` Releases - [3.3.0](#330) | [3.3.1](#331)
+- `3.3.x` Releases - [3.3.0](#330) - [3.3.1](#331)
 - `3.3.0` Betas - [3.3.0-beta1](#330-beta1)
 - `3.2.x` Releases - [3.2.0](#320)
 - `3.1.x` Releases - [3.1.0](#310)
@@ -83,18 +104,18 @@ GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: 
 - `2.9.x` Releases - [2.9.0](#290)
 - `2.8.x` Releases - [2.8.0](#280)
 - `2.7.x` Releases - [2.7.0](#270)
-- `2.6.x` Releases - [2.6.0](#260) | [2.6.1](#261)
+- `2.6.x` Releases - [2.6.0](#260) - [2.6.1](#261)
 - `2.5.x` Releases - [2.5.0](#250)
-- `2.4.x` Releases - [2.4.0](#240) | [2.4.1](#241) | [2.4.2](#242)
-- `2.3.x` Releases - [2.3.0](#230) | [2.3.1](#231)
+- `2.4.x` Releases - [2.4.0](#240) - [2.4.1](#241) - [2.4.2](#242)
+- `2.3.x` Releases - [2.3.0](#230) - [2.3.1](#231)
 - `2.2.x` Releases - [2.2.0](#220)
 - `2.1.x` Releases - [2.1.0](#210)
-- `2.0.x` Releases - [2.0.0](#200) | [2.0.1](#201) | [2.0.2](#202) | [2.0.3](#203)
+- `2.0.x` Releases - [2.0.0](#200) - [2.0.1](#201) - [2.0.2](#202) - [2.0.3](#203)
 
 #### 1.x Releases
 
 - `1.3.x` Releases - [1.3.0](#130)
-- `1.2.x` Releases - [1.2.0](#120) | [1.2.1](#121) | [1.2.2](#122)
+- `1.2.x` Releases - [1.2.0](#120) - [1.2.1](#121) - [1.2.2](#122)
 - `1.1.x` Releases - [1.1.0](#110)
 - `1.0.x` Releases - [1.0.0](#100)
 
@@ -103,6 +124,251 @@ GRDB adheres to [Semantic Versioning](https://semver.org/), with one exception: 
 - [0.110.0](#01100), ...
 
 ---
+
+## 6.27.0
+
+Released April 21, 2024
+
+- **Fixed**: [#1533](https://github.com/groue/GRDB.swift/pull/1533) by [@groue](https://github.com/groue): Fix a bug in Decodable support
+- **Documentation Update**: [#1534](https://github.com/groue/GRDB.swift/pull/1534) The [Single-Row Tables](Documentation/SingleRowTables.md) guide was updated with guidance about default configuration values.
+- **Documentation Update**: [#1535](https://github.com/groue/GRDB.swift/pull/1535) The [ValueObservation Scheduling](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/valueobservation#ValueObservation-Scheduling) documentation chapter explains the default behavior of `ValueObservation` fetches, and explains how to make sure they are never performed on the main thread.
+
+## 6.26.0
+
+Released March 23, 2024
+
+- **New**: [#1503](https://github.com/groue/GRDB.swift/pull/1503) by [@simba909](https://github.com/simba909): Conform Database.ColumnType to Sendable
+- **New**: [#1510](https://github.com/groue/GRDB.swift/pull/1510) by [@groue](https://github.com/groue): Add Sendable conformances and unavailabilities
+- **New**: [#1511](https://github.com/groue/GRDB.swift/pull/1511) by [@groue](https://github.com/groue): Database schema dump
+- **New**: [#1515](https://github.com/groue/GRDB.swift/pull/1515) by [@groue](https://github.com/groue): Support for the CAST SQLite function
+- **Fixed**: [#1508](https://github.com/groue/GRDB.swift/pull/1508) by [@groue](https://github.com/groue): Fix ValueObservation mishandling of database schema modification
+- **Fixed**: [#1512](https://github.com/groue/GRDB.swift/issues/1512): Decoding errors are now correctly reported when decoding NULL into a non-optional property of type `Data` or `Date`.
+
+## 6.25.0
+
+Released February 25, 2024
+
+- **New**: [#1496](https://github.com/groue/GRDB.swift/pull/1496) by [@danielepantaleone](https://github.com/danielepantaleone): Add privacy manifest file.
+
+    A `PrivacyInfo.xcprivacy` resource was added to the GRDB SPM package and Xcode projects. It declares that GRDB does not collect anything. 
+
+## 6.24.2
+
+Released January 21, 2024
+
+- **Documentation Update**: [#1485](https://github.com/groue/GRDB.swift/pull/1485) The [Sharing a Database](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/databasesharing) guide was updated with a new recommendation for databases shared between multiple processes. Writers should always perform IMMEDIATE transactions in order to avoid the `SQLITE_BUSY` error that can occur when transactions overlap. The new recommendation fits in a single line of code: `configuration.defaultTransactionKind = .immediate`.
+- **New**: Associations that involve views instead of tables were already supported, with an explicit `ForeignKey` in their definition. When the foreign key is missing, a clear diagnostic message is now emitted, instead of an unhelpful "no such table" runtime error.
+
+## 6.24.1
+
+Released January 6, 2024
+
+- **New**: [#1477](https://github.com/groue/GRDB.swift/pull/1477): Remove shadow tables from database dump
+
+## 6.24.0
+
+Released January 6, 2024
+
+- **New**: [#1466](https://github.com/groue/GRDB.swift/pull/1466) by [@barnettben](https://github.com/barnettben): Add schema name option to database introspection methods
+
+## 6.23.0
+
+Released December 1, 2023
+
+- **New**: [#1462](https://github.com/groue/GRDB.swift/pull/1462) Temporary read-only access
+
+## 6.22.0
+
+Released November 26, 2023
+
+- **New**: [#1452](https://github.com/groue/GRDB.swift/pull/1452) by [@groue](https://github.com/groue): SQLite 3.44.0, FILTER and ORDER BY clauses in aggregate functions
+- **New**: [#1460](https://github.com/groue/GRDB.swift/pull/1460) by [@groue](https://github.com/groue): Explicit change notifications help applications deal with undetected database changes.
+- **Documentation Update**: The documentations of [`ValueObservation`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/valueobservation), [`DatabaseRegionObservation`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/databaseregionobservation), and [`TransactionObserver`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/transactionobserver) have a new "Dealing with Undetected Changes" that documents possible strategies for notifying applications of undetected database changes.  
+
+## 6.21.0
+
+Released October 29, 2023
+
+- **New**: [#1448](https://github.com/groue/GRDB.swift/pull/1448) by [@groue](https://github.com/groue): Add support for stable ordering and dump of views
+- **New**: [#1449](https://github.com/groue/GRDB.swift/pull/1449) by [@groue](https://github.com/groue): Backport temporary copies from GRDBSnapshotTesting
+
+## 6.20.2
+
+Released October 15, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.20.1...v6.20.2)
+
+- **Fixed**: [#1442](https://github.com/groue/GRDB.swift/pull/1442) by [@groue](https://github.com/groue): Extend the macOS availability of JSON functions
+
+## 6.20.1
+
+Released October 13, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.20.0...v6.20.1)
+
+- **Fixed**: Removed a debug print
+
+## 6.20.0
+
+Released October 13, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.19.0...v6.20.0)
+
+- **New**: [#1439](https://github.com/groue/GRDB.swift/pull/1439) by [@groue](https://github.com/groue): Dump requests
+- **New**: `QueryInterfaceRequest.withStableOrder()` returns a request with well-defined order, suitable for tests. 
+
+## 6.19.0
+
+Released October 4, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.18.0...v6.19.0)
+
+- **New**: [#1429](https://github.com/groue/GRDB.swift/pull/1429) by [@JhonnyBillM](https://github.com/JhonnyBillM): Allow `DatabaseValueConvertible` types to customize their database JSON format
+- **New**: [#1436](https://github.com/groue/GRDB.swift/pull/1436) by [@myyra](https://github.com/myyra) and [@groue](https://github.com/groue): JSON functions
+- **New**: `Database` has learned to create indexes on expressions, and specify specific collations on indexed columns, with the `create(index:on:expressions:options:condition:)` method. 
+- **New**: Codable records can specify coding strategies for their `Data` properties. See [#1436](https://github.com/groue/GRDB.swift/pull/1436) for more information.
+- **Documentation Update**: A new [JSON Support](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/json) article provides an overview of JSON handling.
+- **Documentation Update**: The [Recommended Practices for Designing Record Types](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/recordrecommendedpractices) now recommend that record types with an auto-incremented id avoid conforming to the `Identifiable` protocol.
+
+## 6.18.0
+
+Released September 1, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.17.0...v6.18.0)
+
+- **New**: Expose the database path from `DatabaseReader`.
+
+## 6.17.0
+
+Released August 26, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.16.0...v6.17.0)
+
+- **New**: [#1421](https://github.com/groue/GRDB.swift/pull/1421) by [@groue](https://github.com/groue): Make it possible to open a DatabaseQueue in the WAL mode
+
+## 6.16.0
+
+Released July 9, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.15.1...v6.16.0)
+
+- **New**: [#1397](https://github.com/groue/GRDB.swift/pull/1397) by [@groue](https://github.com/groue): Swift API for creating database views
+- **New**: [#1401](https://github.com/groue/GRDB.swift/pull/1401) by [@kustra](https://github.com/kustra): Linux compilation fixes
+- **New**: [#1402](https://github.com/groue/GRDB.swift/pull/1402) by [@groue](https://github.com/groue): Upgrade custom SQLite builds to 3.42.0
+- **New**: [#1403](https://github.com/groue/GRDB.swift/pull/1403) by [@groue](https://github.com/groue): GitHub CI: test Xcode 14.3.1, macOS 13
+- **New**: :star: [#1405](https://github.com/groue/GRDB.swift/pull/1405) Simplify the declaration of BelongsTo associations in the database schema
+- **Documentation Update**: The documentation was updated for the new recommended way to declare associations in the database schema, with the `belongsTo()` method introduced by [#1405](https://github.com/groue/GRDB.swift/pull/1405):
+    - [`belongsTo(_:inTable:onDelete:onUpdate:deferred:indexed:)`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/tabledefinition/belongsto(_:intable:ondelete:onupdate:deferred:indexed:))
+    - [The Database Schema](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/databaseschema)
+    - [Migrations](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/migrations)
+    - [Recommended Practices for Designing Record Types](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/recordrecommendedpractices)
+    - [Associations](Documentation/AssociationsBasics.md)
+    - [`BelongsToAssociation`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/belongstoassociation)
+    - [`HasManyAssociation`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/hasmanyassociation)
+    - [`HasOneAssociation`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/hasoneassociation)
+
+
+## 6.15.1
+
+Released June 17, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.15.0...v6.15.1)
+
+- **Fixed**: Fixed Xcode 15 warnings
+- **Fixed**: [#1391](https://github.com/groue/GRDB.swift/pull/1391) Fix upsert in FTS5-synchronized tables
+
+
+## 6.15.0
+
+Released June 2, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.14.0...v6.15.0)
+
+- **New**: [#1382](https://github.com/groue/GRDB.swift/pull/1382) Add `DerivableRequest.all()`
+- **New**: [#1384](https://github.com/groue/GRDB.swift/pull/1384) Allow ValueObservation to start from a truncated wal file
+- **Documentation Update**: The [ValueObservation Performance](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/valueobservation#ValueObservation-Performance) documentation chapter explains how truncating WAL checkpoints impact `ValueObservation`.
+
+
+## 6.14.0
+
+Released May 25, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.13.0...v6.14.0)
+
+- **New**: [#1376](https://github.com/groue/GRDB.swift/pull/1376) Bitwise operations
+- **New**: [#1379](https://github.com/groue/GRDB.swift/pull/1379) Create indexes with a default name
+
+
+## 6.13.0
+
+Released May 15, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.12.0...v6.13.0)
+
+- **New**: [#1373](https://github.com/groue/GRDB.swift/pull/1373) Deprecate string literal arguments for `TableDefinition.check()`
+
+
+## 6.12.0
+
+Released April 29, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.11.0...v6.12.0)
+
+- **Fixed**: [#1364](https://github.com/groue/GRDB.swift/pull/1364) Fix a regression introduced with version 6.10.0, where starting multiple observations while performing writes could create a deadlock.
+- **New**: `FetchableRecordDecoder` is an object that decodes `Decodable` fetchable records from database rows. You may want to use this decoder when you want to use the `Decodable` initializer from `init(row: Row)`.
+
+## 6.11.0
+
+Released April 17, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.10.2...v6.11.0)
+
+- **New**: [#1361](https://github.com/groue/GRDB.swift/pull/1361) `DatabaseMigrator.eraseDatabaseOnSchemaChange` ignores internal schema objects
+
+## 6.10.2
+
+Released April 10, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.10.1...v6.10.2)
+
+- **Documentation Update**: The [Recommended Practices for Designing Record Types](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/recordrecommendedpractices) guide has moved to DocC.
+- **Documentation Update**: The [Demo Applications](Documentation/DemoApps/) demonstrate how their `AppDatabase` "database manager" can provide a base database configuration. 
+
+## 6.10.1
+
+Released April 1, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.10.0...v6.10.1)
+
+- **Fixed**: [#1357](https://github.com/groue/GRDB.swift/pull/1357) `QueryInterfaceRequest.fetchCount` no longer executes invalid SQL queries for some requests.
+
+## 6.10.0
+
+Released March 20, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.9.2...v6.10.0)
+
+- **New**: [#1350](https://github.com/groue/GRDB.swift/pull/1350) by [@groue](https://github.com/groue): DatabasePool won't close read-only connections if requested, and ValueObservation no longer opens a new database connection when it starts.
+
+## 6.9.2
+
+Released March 14, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.9.1...v6.9.2)
+
+- **Fixed**: [#1349](https://github.com/groue/GRDB.swift/pull/1349) by [@JonLz](https://github.com/JonLz): Fix Migrations.md example so it compiles
+- **Fixed**: Avoid the risk for pathologically deep stack trace, or stack overflow, introduced by [#1348](https://github.com/groue/GRDB.swift/pull/1348).
+
+## 6.9.1
+
+Released March 12, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.9.0...v6.9.1)
+
+- **Documentation Updates**: Moved more README chapters into DocC:
+    - [`RowAdapter`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/rowadapter)
+    - [`splittingRowAdapters(columnCounts:)`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/splittingrowadapters(columncounts:))
+
+## 6.9.0
+
+Released March 12, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.8.0...v6.9.0)
+
+- **New**: [#1348](https://github.com/groue/GRDB.swift/pull/1348) by [@groue](https://github.com/groue): SQLite argument binding optimization
+- **New**: `FTS5.api(db)` returns a pointer to the `fts5_api` structure, useful for low-level [FTS5 customization](https://www.sqlite.org/fts5.html#extending_fts5).
+- **Documentation Updates**: Moved more README chapters into DocC, enhanced and extended DocC articles:
+    - [Database Connections](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/databaseconnections)
+    - [Prepared Statements](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/statement)
+    - [DatabaseValueConvertible](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/databasevalueconvertible)
+
+## 6.8.0
+
+Released February 24, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.7.0...v6.8.0)
+
+- **New**: [#1338](https://github.com/groue/GRDB.swift/pull/1338) by [@groue](https://github.com/groue): TimestampedRecord sample code
+- **New**: `EncodableRecord.databaseChanges(modify:)` modifies a record and returns a dictionary of applied changes.
+- **Documentation Update**: The [Record Timestamps and Transaction Date](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/recordtimestamps) article provides a sample `TimestampedRecord` protocol that application may adapt for their own use.
+
+## 6.7.0
+
+Released February 19, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.6.1...v6.7.0)
+
+- **Fixed**: [#1316](https://github.com/groue/GRDB.swift/pull/1316) and [#1320](https://github.com/groue/GRDB.swift/pull/1320) by [@baekteun](https://github.com/baekteun): Replace "OSX" with "macOS".
+- **Fixed**: [#1328](https://github.com/groue/GRDB.swift/pull/1328) by [@ytti](https://github.com/ytti): Fix documentation about Data passphrases.
+- **Fixed**: [#1327](https://github.com/groue/GRDB.swift/pull/1327) by [@groue](https://github.com/groue): Remove dependency on any specific SwiftLint version.
+- **New**: [#1331](https://github.com/groue/GRDB.swift/pull/1331) by [@groue](https://github.com/groue): Transaction Date
+- **New**: [#1336](https://github.com/groue/GRDB.swift/pull/1336) by [@groue](https://github.com/groue): Enable FTS5 by default
+- **Documentation Update**: The new [Record Timestamps and Transaction Date](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/recordtimestamps) article explains how applications can save the creation and modification date of records.
+- Added support for `Table` in SQL interpolation.
+
+## 6.6.1
+
+Released January 15, 2023 &bull; [diff](https://github.com/groue/GRDB.swift/compare/v6.6.0...v6.6.1)
+
+- **Fixed**: [#1317](https://github.com/groue/GRDB.swift/pull/1317) by [@groue](https://github.com/groue): Fix handling of multiple deep prefetched associations
 
 ## 6.6.0
 
@@ -3654,7 +3920,7 @@ It comes with breaking changes, but the good news is that they are the last (unt
     
     As a matter of fact, GRDB 1.0 still supports Xcode 8.1 and Swift 3.0. But future versions are free to use Swift 3.1 features, and will require Xcode 8.3+.
     
-    The targetted operating systems are unchanged: iOS 8.0+ / OSX 10.9+ / watchOS 2.0+
+    The targetted operating systems are unchanged: iOS 8.0+ / macOS 10.9+ / watchOS 2.0+
 
 - **[Record types](https://github.com/groue/GRDB.swift#records) have their `persistentDictionary` property replaced with the `encode(to:)` method:**
     
@@ -5462,11 +5728,11 @@ Released May 17, 2016
 
 **Fixed**
 
-- Restored support for iOS before 8.2 and OS X before 10.10. Fixes [#51](https://github.com/groue/GRDB.swift/issues/51).
+- Restored support for iOS before 8.2 and macOS before 10.10. Fixes [#51](https://github.com/groue/GRDB.swift/issues/51).
 
 **Breaking Changes**
 
-- Support for advanced migrations is not available until iOS 8.2 and OS X 10.10:
+- Support for advanced migrations is not available until iOS 8.2 and macOS 10.10:
     
     ```diff
      struct DatabaseMigrator {
@@ -5522,7 +5788,7 @@ Released May 10, 2016
 
 **New**
 
-- `FetchedRecordsController` is now exposed in OSX CocoaPods framework ([documentation](https://github.com/groue/GRDB.swift#fetchedrecordscontroller))
+- `FetchedRecordsController` is now exposed in macOS CocoaPods framework ([documentation](https://github.com/groue/GRDB.swift#fetchedrecordscontroller))
 
 **Fixed**
 
@@ -5655,7 +5921,7 @@ Released April 5, 2016
 
 **Fixed**
 
-- Restored CocoaPods support for iOS 8+ and OS X 10.9+
+- Restored CocoaPods support for iOS 8+ and macOS 10.9+
 
 
 ## 0.56.0
@@ -5698,7 +5964,7 @@ Released March 31, 2016
 
 Released March 29, 2016
 
-This release restores CocoaPods support for iOS 9.0+ and OSX 10.11+. We'll try to bring back CocoaPods support for iOS 8.0+ or OSX 10.9+ in a further release.
+This release restores CocoaPods support for iOS 9.0+ and macOS 10.11+. We'll try to bring back CocoaPods support for iOS 8.0+ or macOS 10.9+ in a further release.
 
 
 ## 0.54.0
@@ -6597,7 +6863,7 @@ Released August 25, 2015
 
 **Fixed**
 
-- Reduced iOS Deployment Target to 8.0, and OSX Deployment Target to 10.9.
+- Reduced iOS Deployment Target to 8.0, and macOS Deployment Target to 10.9.
 - `DatabaseQueue.inTransaction()` is now declared as `rethrows`.
 
 **Breaking changes**

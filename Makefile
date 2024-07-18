@@ -52,11 +52,17 @@ MAX_IOS_DESTINATION := $(shell xcrun simctl list -j devices available | Scripts/
 MIN_TVOS_DESTINATION := $(shell xcrun simctl list -j devices available | Scripts/destination.rb | grep tvOS | sort -n | head -1 | cut -wf 3 | sed 's/\(.*\)/"platform=tvOS Simulator,id=\1"/')
 MAX_TVOS_DESTINATION := $(shell xcrun simctl list -j devices available | Scripts/destination.rb | grep tvOS | sort -rn | head -1 | cut -wf 3 | sed 's/\(.*\)/"platform=tvOS Simulator,id=\1"/')
 
-# If xcpretty is available, use it for xcodebuild output
-XCPRETTY = 
-XCPRETTY_PATH := $(shell command -v xcpretty 2> /dev/null)
-ifdef XCPRETTY_PATH
-  XCPRETTY = | xcpretty -c
+  # If xcbeautify or xcpretty is available, use it for xcodebuild output, except in CI.
+XCPRETTY =
+ifeq ($(CI),true)
+else
+  XCBEAUTIFY_PATH := $(shell command -v xcbeautify 2> /dev/null)
+  XCPRETTY_PATH := $(shell command -v xcpretty 2> /dev/null)
+  ifdef XCBEAUTIFY_PATH
+    XCPRETTY = | xcbeautify
+  else ifdef XCPRETTY_PATH
+    XCPRETTY = | xcpretty -c
+  endif
 endif
 
 # =====
@@ -69,8 +75,8 @@ test_framework_darwin: test_framework_GRDB test_framework_GRDBCustom test_framew
 test_framework_GRDB: test_framework_GRDBOSX test_framework_GRDBiOS test_framework_GRDBtvOS
 test_framework_GRDBCustom: test_framework_GRDBCustomSQLiteOSX test_framework_GRDBCustomSQLiteiOS
 test_framework_SQLCipher: test_framework_SQLCipher3 test_framework_SQLCipher3Encrypted test_framework_SQLCipher4 test_framework_SQLCipher4Encrypted
-test_archive: test_archive_GRDBOSX_xcframework
-test_install: test_install_manual test_install_SPM test_install_customSQLite test_install_GRDB_CocoaPods test_CocoaPodsLint
+test_archive: test_universal_xcframework
+test_install: test_install_manual test_install_SPM test_install_customSQLite test_install_GRDB_CocoaPods
 test_CocoaPodsLint: test_CocoaPodsLint_GRDB
 test_demo_apps: test_GRDBDemoiOS test_GRDBCombineDemo test_GRDBAsyncDemo
 
@@ -128,6 +134,7 @@ test_framework_GRDBCustomSQLiteOSX: SQLiteCustom
 	$(XCODEBUILD) \
 	  -project GRDBCustom.xcodeproj \
 	  -scheme GRDBCustom \
+	  -destination "platform=macOS" \
 	  $(TEST_ACTIONS) \
 	  $(XCPRETTY)
 
@@ -212,22 +219,51 @@ test_SPM:
 	$(SWIFT) build -c release
 	set -o pipefail && $(SWIFT) test --parallel
 
-test_archive_GRDBOSX_xcframework:
+test_universal_xcframework:
 	rm -rf Tests/products
 	mkdir Tests/products
 	$(XCODEBUILD) archive \
 	  -project GRDB.xcodeproj \
 	  -scheme GRDB \
-	  -configuration Release \
+	  -destination "generic/platform=iOS" \
+	  OTHER_SWIFT_FLAGS=$(OTHER_SWIFT_FLAGS) \
+	  GCC_PREPROCESSOR_DEFINITIONS=$(GCC_PREPROCESSOR_DEFINITIONS) \
+	  -archivePath "$(PWD)/Tests/products/GRDB-iOS.xcarchive" \
+	  SKIP_INSTALL=NO \
+	  BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+	$(XCODEBUILD) archive \
+	  -project GRDB.xcodeproj \
+	  -scheme GRDB \
+	  -destination "generic/platform=iOS Simulator" \
+	  OTHER_SWIFT_FLAGS=$(OTHER_SWIFT_FLAGS) \
+	  GCC_PREPROCESSOR_DEFINITIONS=$(GCC_PREPROCESSOR_DEFINITIONS) \
+	  -archivePath "$(PWD)/Tests/products/GRDB-iOS_Simulator.xcarchive" \
+	  SKIP_INSTALL=NO \
+	  BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+	$(XCODEBUILD) archive \
+	  -project GRDB.xcodeproj \
+	  -scheme GRDB \
 	  -destination "generic/platform=macOS" \
 	  OTHER_SWIFT_FLAGS=$(OTHER_SWIFT_FLAGS) \
 	  GCC_PREPROCESSOR_DEFINITIONS=$(GCC_PREPROCESSOR_DEFINITIONS) \
-	  -archivePath "$(PWD)/Tests/products/GRDB.xcarchive" \
+	  -archivePath "$(PWD)/Tests/products/GRDB-macOS.xcarchive" \
+	  SKIP_INSTALL=NO \
+	  BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+	$(XCODEBUILD) archive \
+	  -project GRDB.xcodeproj \
+	  -scheme GRDB \
+	  -destination "generic/platform=macOS,variant=Mac Catalyst" \
+	  OTHER_SWIFT_FLAGS=$(OTHER_SWIFT_FLAGS) \
+	  GCC_PREPROCESSOR_DEFINITIONS=$(GCC_PREPROCESSOR_DEFINITIONS) \
+	  -archivePath "$(PWD)/Tests/products/GRDB-Mac_Catalyst.xcarchive" \
 	  SKIP_INSTALL=NO \
 	  BUILD_LIBRARY_FOR_DISTRIBUTION=YES
 	$(XCODEBUILD) -create-xcframework \
-	  -framework '$(PWD)/Tests/products/GRDB.xcarchive/Products/Library/Frameworks/GRDB.framework' \
-	  -output '$(PWD)/Tests/products/GRDB.xcframework'
+      -archive '$(PWD)/Tests/products/GRDB-iOS.xcarchive' -framework GRDB.framework \
+      -archive '$(PWD)/Tests/products/GRDB-iOS_Simulator.xcarchive' -framework GRDB.framework \
+      -archive '$(PWD)/Tests/products/GRDB-macOS.xcarchive' -framework GRDB.framework \
+      -archive '$(PWD)/Tests/products/GRDB-Mac_Catalyst.xcarchive' -framework GRDB.framework \
+      -output '$(PWD)/Tests/products/GRDB.xcframework'
 
 test_install_manual:
 	$(XCODEBUILD) \
@@ -249,6 +285,7 @@ test_install_SPM_Project:
 	$(XCODEBUILD) \
 	  -project Tests/SPM/PlainProject/Plain.xcodeproj \
 	  -scheme Plain \
+	  -destination "platform=macOS" \
 	  -configuration Release \
 	  clean build \
 	  $(XCPRETTY)
@@ -266,6 +303,7 @@ test_install_SPM_macos_release:
 	$(XCODEBUILD) \
 	  -project Tests/SPM/macos/macos.xcodeproj \
 	  -scheme macos \
+	  -destination "platform=macOS" \
 	  -configuration Release \
 	  clean build \
 	  $(XCPRETTY)
@@ -283,6 +321,7 @@ test_install_customSQLite: SQLiteCustom
 	$(XCODEBUILD) \
 	  -project Tests/CustomSQLite/CustomSQLite.xcodeproj \
 	  -scheme CustomSQLite \
+	  -destination "platform=macOS" \
 	  -configuration Release \
 	  clean build \
 	  $(XCPRETTY)
@@ -357,6 +396,7 @@ test_performance:
 	$(XCODEBUILD) \
 	  -project Tests/Performance/GRDBPerformance/GRDBPerformance.xcodeproj \
 	  -scheme GRDBOSXPerformanceComparisonTests \
+	  -destination "platform=macOS" \
 	  build-for-testing test-without-building
 
 # Target that setups SQLite custom builds with extra compilation options.

@@ -4,344 +4,6 @@ import Combine
 import Dispatch
 import Foundation
 
-/// `ValueObservation` tracks changes in the results of database requests, and
-/// notifies fresh values whenever the database changes.
-///
-/// ## Overview
-///
-/// Tracked changes are insertions, updates, and deletions that impact the
-/// tracked value, whether performed with raw SQL, or <doc:QueryInterface>.
-/// This includes indirect changes triggered by
-/// [foreign keys actions](https://www.sqlite.org/foreignkeys.html#fk_actions)
-/// or [SQL triggers](https://www.sqlite.org/lang_createtrigger.html).
-///
-/// Changes to internal system tables (such as `sqlite_master`) and changes to
-/// [`WITHOUT ROWID`](https://www.sqlite.org/withoutrowid.html) tables are
-/// not notified.
-///
-/// ## ValueObservation Usage
-///
-/// 1. Make sure that a unique database connection, ``DatabaseQueue`` or
-/// ``DatabasePool``, is kept open during the whole duration of
-/// the observation.
-///
-///     `ValueObservation` does not notify changes performed by
-///     external connections.
-///     See <doc:DatabaseSharing#How-to-perform-cross-process-database-observation>
-///     for more information.
-///
-/// 2. Create a `ValueObservation` with a closure that fetches the
-/// observed value:
-///
-///     ```swift
-///     let observation = ValueObservation.tracking { db in
-///         // Fetch and return the observed value
-///     }
-///
-///     // For example, an observation of [Player], which tracks all players:
-///     let observation = ValueObservation.tracking { db in
-///         try Player.fetchAll(db)
-///     }
-///
-///     // The same observation, using shorthand notation:
-///     let observation = ValueObservation.tracking(Player.fetchAll)
-///     ```
-///
-///     There is no limit on the values that can be observed. An observation
-///     can perform multiple requests, from multiple database tables, and use
-///     raw SQL. See ``tracking(_:)`` for some examples.
-///
-/// 3. Start the observation in order to be notified of changes:
-///
-///     ```swift
-///     let cancellable = observation.start(in: dbQueue) { error in
-///         // Handle error
-///     } onChange: { (players: [Player]) in
-///         print("Fresh players", players)
-///     }
-///     ```
-///
-/// 4. Stop the observation by calling the ``DatabaseCancellable/cancel()``
-/// method on the object returned by the `start` method. Cancellation is
-/// automatic when the cancellable is deallocated:
-///
-///     ```swift
-///     cancellable.cancel()
-///     ```
-///
-/// `ValueObservation` can also be turned into an async sequence, a Combine
-/// publisher, or an RxSwift observable (see the companion library
-/// [RxGRDB](https://github.com/RxSwiftCommunity/RxGRDB)):
-///
-/// - Async sequence:
-///
-///     ```swift
-///     do {
-///         for try await players in observation.values(in: dbQueue) {
-///             print("Fresh players", players)
-///         }
-///     } catch {
-///         // Handle error
-///     }
-///     ```
-///
-/// - Combine Publisher:
-///
-///     ```swift
-///     let cancellable = observation.publisher(in: dbQueue).sink { completion in
-///         // Handle completion
-///     } receiveValue: { (players: [Player]) in
-///         print("Fresh players", players)
-///     }
-///     ```
-///
-/// ## ValueObservation Behavior
-///
-/// `ValueObservation` notifies an initial value before the eventual changes.
-///
-/// `ValueObservation` only notifies changes committed to disk.
-///
-/// By default, `ValueObservation` notifies a fresh value whenever any component
-/// of its fetched value is modified (any fetched column, row, etc.). This can
-/// be configured:
-/// see <doc:ValueObservation#Specifying-the-Tracked-Region>.
-///
-/// By default, `ValueObservation` notifies the initial value, as well as
-/// eventual changes and errors, on the main dispatch queue, asynchronously.
-/// This can be configured:
-/// see <doc:ValueObservation#ValueObservation-Scheduling>.
-///
-/// `ValueObservation` may coalesce subsequent changes into a
-/// single notification.
-///
-/// `ValueObservation` may notify consecutive identical values. You can filter
-/// out the undesired duplicates with the ``removeDuplicates()`` method.
-///
-/// Starting an observation retains the database connection, until it is
-/// stopped. As long as the observation is active, the database connection
-/// won't be deallocated.
-///
-/// The database observation stops when the cancellable returned by the `start`
-/// method is cancelled or deallocated, or if an error occurs.
-///
-/// Take care that there are use cases that `ValueObservation` is unfit for.
-/// For example, an application may need to process absolutely all changes,
-/// and avoid any coalescing. An application may also need to process changes
-/// before any further modifications could be performed in the database file. In
-/// those cases, the application needs to track *individual transactions*, not
-/// values: use ``DatabaseRegionObservation``. If you need to process
-/// changes before they are committed to disk, use ``TransactionObserver``.
-///
-/// ## ValueObservation Scheduling
-///
-/// By default, `ValueObservation` notifies the initial value, as well as
-/// eventual changes and errors, on the main dispatch queue, asynchronously:
-///
-/// ```swift
-/// // The default scheduling
-/// let cancellable = observation.start(in: dbQueue) { error in
-///     // Called asynchronously on the main dispatch queue
-/// } onChange: { value in
-///     // Called asynchronously on the main dispatch queue
-///     print("Fresh value", value)
-/// }
-/// ```
-///
-/// You can change this behavior by adding a `scheduling` argument to the
-/// `start()` method.
-///
-/// For example, the ``ValueObservationScheduler/immediate`` scheduler
-/// notifies all values on the main dispatch queue, and notifies the first
-/// one immediately when the observation starts.
-///
-/// It is very useful in graphic applications, because you can configure views
-/// right away, without waiting for the initial value to be fetched eventually.
-/// You don't have to implement any empty or loading screen, or to prevent some
-/// undesired initial animation.
-///
-/// The `immediate` scheduling requires that the observation starts from the
-/// main dispatch queue (a fatal error is raised otherwise):
-///
-/// ```swift
-/// let cancellable = observation.start(in: dbQueue, scheduling: .immediate) { error in
-///     // Called on the main dispatch queue
-/// } onChange: { value in
-///     // Called on the main dispatch queue
-///     print("Fresh value", value)
-/// }
-/// // <- Here "Fresh value" has already been printed.
-/// ```
-///
-/// The other built-in scheduler ``ValueObservationScheduler/async(onQueue:)``
-/// asynchronously schedules values and errors on the dispatch queue of
-/// your choice.
-///
-/// ## ValueObservation Sharing
-///
-/// Sharing a `ValueObservation` spares database resources. When a database
-/// change happens, a fresh value is fetched only once, and then notified to
-/// all clients of the shared observation.
-///
-/// You build a shared observation with ``shared(in:scheduling:extent:)``:
-///
-/// ```swift
-/// // SharedValueObservation<[Player]>
-/// let sharedObservation = ValueObservation
-///     .tracking { db in try Player.fetchAll(db) }
-///     .shared(in: dbQueue)
-/// ```
-///
-/// `ValueObservation` and `SharedValueObservation` are nearly identical, but
-/// the latter has no operator such as `map`. As a replacement, you may
-/// for example use Combine apis:
-///
-/// ```swift
-/// let cancellable = try sharedObservation
-///     .publisher() // Turn shared observation into a Combine Publisher
-///     .map { ... } // The map operator from Combine
-///     .sink(...)
-/// ```
-///
-///
-/// ## Specifying the Tracked Region
-///
-/// While the standard ``tracking(_:)`` method lets you track changes to a
-/// fetched value and receive any changes to it, sometimes your use case might
-/// require more granular control.
-///
-/// Consider a scenario where you'd like to get a specific Player's row, but
-/// only when their `score` column changes. You can use
-/// ``tracking(region:fetch:)`` to do just that:
-///
-/// ```swift
-/// let observation = ValueObservation.tracking(
-///     // Define what database region constitutes a "change"
-///     region: Player.select(Column("score")).filter(id: 1),
-///     // Define what to fetch upon such change
-///     fetch: { db in try Player.fetchOne(db, id: 1) }
-/// )
-/// ```
-///
-/// This overload of `ValueObservation` lets you entirely separate the
-/// **observed region** from the **fetched value** itself, providing utmost
-/// flexibility. See ``DatabaseRegionConvertible`` for more information about
-/// the regions that can be tracked.
-///
-/// ## ValueObservation Performance
-///
-/// This section further describes runtime aspects of `ValueObservation`, and
-/// provides some optimization tips for demanding applications.
-///
-/// **`ValueObservation` is triggered by database transactions that may modify
-/// the tracked value.**
-///
-/// Precisely speaking, `ValueObservation` tracks changes in a
-/// ``DatabaseRegion``, not changes in values.
-///
-/// For example, if you track the maximum score of players, all transactions
-/// that impact the `score` column of the `player` database table (any update,
-/// insertion, or deletion) trigger the observation, even if the maximum score
-/// itself is not changed.
-///
-/// You can filter out undesired duplicate notifications with the
-/// ``removeDuplicates()`` method.
-///
-/// **ValueObservation can create database contention.** In other words, active
-/// observations take a toll on the constrained database resources. When
-/// triggered by impactful transactions, observations fetch fresh values, and
-/// can delay read and write database accesses of other application components.
-///
-/// When needed, you can help GRDB optimize observations and reduce
-/// database contention:
-///
-/// > Tip: Stop observations when possible.
-/// >
-/// > For example, if a `UIViewController` needs to display database values, it
-/// > can start the observation in `viewWillAppear`, and stop it in
-/// > `viewWillDisappear`.
-/// >
-/// > In a SwiftUI application, you can profit from the
-/// > [GRDBQuery](https://github.com/groue/GRDBQuery) companion library, and its
-/// > [`View.queryObservation(_:)`](https://swiftpackageindex.com/groue/grdbquery/documentation/grdbquery/queryobservation)
-/// > method.
-///
-/// > Tip: Share observations when possible.
-/// >
-/// > Each call to `ValueObservation.start` method triggers independent values
-/// > refreshes. When several components of your app are interested in the same
-/// > value, consider sharing the observation
-/// > with ``shared(in:scheduling:extent:)``.
-///
-/// > Tip: Use a ``DatabasePool``, because it can perform multi-threaded
-/// > database accesses.
-///
-/// > Tip: When the observation processes some raw fetched values, use the
-/// > ``map(_:)`` operator:
-/// >
-/// > ```swift
-/// > // Plain observation
-/// > let observation = ValueObservation.tracking { db -> MyValue in
-/// >     let players = try Player.fetchAll(db)
-/// >     return computeMyValue(players)
-/// > }
-/// >
-/// > // Optimized observation
-/// > let observation = ValueObservation
-/// >     .tracking { db try Player.fetchAll(db) }
-/// >     .map { players in computeMyValue(players) }
-/// > ```
-/// >
-/// > The `map` operator helps reducing database contention because it performs
-/// > its job without blocking database accesses.
-///
-/// > Tip: When the observation tracks a constant database region, create an
-/// > optimized observation with the ``trackingConstantRegion(_:)`` method. See
-/// > the documentation of this method for more information about what
-/// > constitutes a "constant region", and the nature of the optimization.
-///
-/// ## Topics
-///
-/// ### Creating a ValueObservation
-///
-/// - ``tracking(_:)``
-/// - ``trackingConstantRegion(_:)``
-/// - ``tracking(region:fetch:)``
-/// - ``tracking(regions:fetch:)``
-///
-/// ### Creating a Shared Observation
-///
-/// - ``shared(in:scheduling:extent:)``
-/// - ``SharedValueObservationExtent``
-///
-/// ### Accessing Observed Values
-///
-/// - ``publisher(in:scheduling:)``
-/// - ``start(in:scheduling:onError:onChange:)``
-/// - ``values(in:scheduling:bufferingPolicy:)``
-/// - ``DatabaseCancellable``
-/// - ``ValueObservationScheduler``
-///
-/// ### Mapping Values
-///
-/// - ``map(_:)``
-///
-/// ### Filtering Values
-///
-/// - ``removeDuplicates()``
-/// - ``removeDuplicates(by:)``
-///
-/// ### Requiring Write Access
-///
-/// - ``requiresWriteAccess``
-///
-/// ### Debugging
-///
-/// - ``handleEvents(willStart:willFetch:willTrackRegion:databaseDidChange:didReceiveValue:didFail:didCancel:)``
-/// - ``print(_:to:)``
-///
-/// ### Support
-///
-/// - ``ValueReducer``
 public struct ValueObservation<Reducer: _ValueReducer> {
     var events = ValueObservationEvents()
     
@@ -634,7 +296,7 @@ extension ValueObservation {
     /// - parameter reader: A DatabaseReader.
     /// - parameter scheduler: A ValueObservationScheduler. By default, fresh
     ///   values are dispatched asynchronously on the main dispatch queue.
-    @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     public func values(
         in reader: some DatabaseReader,
         scheduling scheduler: some ValueObservationScheduler = .async(onQueue: .main),
@@ -648,6 +310,7 @@ extension ValueObservation {
     }
 }
 
+// TODO: [GRDB7] Make it Sendable for easier integration with AsyncAlgorithms
 /// An asynchronous sequence of values observed by a ``ValueObservation``.
 ///
 /// - note: [**🔥 EXPERIMENTAL**](https://github.com/groue/GRDB.swift/blob/master/README.md#what-are-experimental-features)
@@ -669,7 +332,7 @@ extension ValueObservation {
 ///
 /// You build an `AsyncValueObservation` from ``ValueObservation`` or
 /// ``SharedValueObservation``.
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 public struct AsyncValueObservation<Element>: AsyncSequence {
     public typealias BufferingPolicy = AsyncThrowingStream<Element, Error>.Continuation.BufferingPolicy
     public typealias AsyncIterator = Iterator
@@ -704,7 +367,7 @@ public struct AsyncValueObservation<Element>: AsyncSequence {
         }
         
         let iterator = stream.makeAsyncIterator()
-        if let cancellable = cancellable {
+        if let cancellable {
             return Iterator(
                 iterator: iterator,
                 cancellable: cancellable)
@@ -771,7 +434,7 @@ extension ValueObservation {
     /// - parameter scheduler: A ValueObservationScheduler. By default, fresh
     ///   values are dispatched asynchronously on the main dispatch queue.
     /// - returns: A Combine publisher
-    @available(OSX 10.15, iOS 13, tvOS 13, watchOS 6, *)
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     public func publisher(
         in reader: some DatabaseReader,
         scheduling scheduler: some ValueObservationScheduler = .async(onQueue: .main))
@@ -788,7 +451,7 @@ extension ValueObservation {
     }
 }
 
-@available(OSX 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension DatabasePublishers {
     /// A publisher that publishes the values of a ``ValueObservation``.
     ///
@@ -932,12 +595,18 @@ extension ValueObservation {
     /// Creates an optimized `ValueObservation` that notifies the fetched value
     /// whenever it changes.
     ///
-    /// The optimization reduces database contention by not blocking database
-    /// writes when the fresh value is fetched.
+    /// Unlike observations created with ``tracking(_:)``, the returned
+    /// observation can reduce database contention, by not blocking
+    /// database writes when fresh values are fetched. It can also avoid
+    /// fetching fresh values from the main thread, after the database was
+    /// modified on the main thread.
     ///
-    /// The optimization is only applied when the observation is started from a
-    /// ``DatabasePool``. You can start such an observation from a
-    /// ``DatabaseQueue``, but the optimization will not be applied.
+    /// Those scheduling optimizations are only applied when the observation
+    /// is started from a ``DatabasePool``. You can start such an
+    /// observation from a ``DatabaseQueue``, but the optimizations will not
+    /// be applied. The notified values will be the same, though. This makes
+    /// it possible to use a pool in the main application, and an in-memory
+    /// queue in tests and Xcode previews.
     ///
     /// **Precondition**: The `fetch` function must perform requests that fetch
     /// from a single and constant database region. This region is made of
@@ -960,7 +629,7 @@ extension ValueObservation {
     ///
     /// // Tracks the 'score' column in the 'player' table
     /// let observation = ValueObservation.trackingConstantRegion { db -> Int? in
-    ///     try Player.select(max(Column("score"))).fetchOne(db)
+    ///     try Int.fetchOne(db, sql: "SELECT MAX(score) FROM player")
     /// }
     ///
     /// // Tracks both the 'player' and 'team' tables
@@ -971,73 +640,93 @@ extension ValueObservation {
     /// }
     /// ```
     ///
-    /// Observations that do not track a constant region must not use this
-    /// method. Use ``tracking(_:)`` instead, or else some changes will not
-    /// be notified.
+    /// **Observations that do not track a constant database region must not
+    /// use this method, because some changes may not be notified to
+    /// the application.**
     ///
-    /// For example, the observations below do not track a constant region, and
-    /// must not be optimized:
+    /// For example, the observations below do not track a constant region.
+    /// They are correctly defined with ``tracking(_:)``, since
+    /// `trackingConstantRegion(_:)` is unsuited:
     ///
     /// ```swift
-    /// // Does not always track the same row in the player table.
-    /// let observation = ValueObservation.tracking { db -> Player? in
-    ///     let pref = try Preference.fetchOne(db) ?? .default
-    ///     return try Player.fetchOne(db, id: pref.favoritePlayerId)
+    /// // Does not always track the same row in the 'player' table:
+    /// let observation = ValueObservation.tracking { db -> Player in
+    ///     let config = try AppConfiguration.find(db)
+    ///     let playerId: Int64 = config.favoritePlayerId
+    ///     return try Player.find(db, id: playerId)
     /// }
     ///
-    /// // Does not always track the 'user' table.
-    /// let observation = ValueObservation.tracking { db -> [User] in
-    ///     let pref = try Preference.fetchOne(db) ?? .default
-    ///     let playerIds: [Int64] = pref.favoritePlayerIds // may be empty
+    /// // Does not always track the 'player' table, or not always the same
+    /// // rows in the 'player' table:
+    /// let observation = ValueObservation.tracking { db -> [Player] in
+    ///     let config = try AppConfiguration.find(db)
+    ///     let playerIds: [Int64] = config.favoritePlayerIds
+    ///     // Not only playerIds can change, but when it is empty,
+    ///     // the player table is not tracked at all.
     ///     return try Player.fetchAll(db, ids: playerIds)
     /// }
     ///
     /// // Sometimes tracks the 'food' table, and sometimes the 'beverage' table.
     /// let observation = ValueObservation.tracking { db -> Int in
-    ///     let pref = try Preference.fetchOne(db) ?? .default
-    ///     switch pref.selection {
-    ///     case .food: return try Food.fetchCount(db)
-    ///     case .beverage: return try Beverage.fetchCount(db)
+    ///     let config = try AppConfiguration.find(db)
+    ///     switch config.selection {
+    ///     case .food:
+    ///         return try Food.fetchCount(db)
+    ///     case .beverage:
+    ///         return try Beverage.fetchCount(db)
     ///     }
     /// }
     /// ```
     ///
-    /// You can turn them into optimized observations of a constant region with
-    /// the ``Database/registerAccess(to:)`` method:
+    /// Since only observations of a constant region can achieve important
+    /// scheduling optimizations (such as the guarantee that fresh values
+    /// are never fetched from the main thread –
+    /// see <doc:ValueObservation#ValueObservation-Scheduling>), you can
+    /// always create one:
     ///
-    /// ```swift
-    /// let observation = ValueObservation.trackingConstantRegion { db -> Player? in
-    ///     // Track all players so that the observed region does not depend on
-    ///     // the rowid of the favorite player.
-    ///     try db.registerAccess(to: Player.all())
+    /// - With ``tracking(regions:fetch:)``, you provide all tracked
+    ///   region(s) when the observation is created:
     ///
-    ///     let pref = try Preference.fetchOne(db) ?? .default
-    ///     return try Player.fetchOne(db, id: pref.favoritePlayerId)
-    /// }
+    ///     ```swift
+    ///     // Optimized observation that explicitly tracks the
+    ///     // 'appConfiguration', 'food', and 'beverage' tables:
+    ///     let observation = ValueObservation.tracking(
+    ///         regions: [
+    ///             AppConfiguration.all(),
+    ///             Food.all(),
+    ///             Beverage.all(),
+    ///         ],
+    ///         fetch: { db -> Int in
+    ///             let config = try AppConfiguration.find(db)
+    ///             switch config.selection {
+    ///             case .food:
+    ///                 return try Food.fetchCount(db)
+    ///             case .beverage:
+    ///                 return try Beverage.fetchCount(db)
+    ///             }
+    ///         })
+    ///     ```
     ///
-    /// let observation = ValueObservation.trackingConstantRegion { db -> [User] in
-    ///     // Track all players so that the observed region does not change
-    ///     // even if there is no favorite player at all.
-    ///     try db.registerAccess(to: Player.all())
+    /// - With ``Database/registerAccess(to:)``, you extend the list of
+    ///   tracked region(s) from the fetching closure:
     ///
-    ///     let pref = try Preference.fetchOne(db) ?? .default
-    ///     let playerIds: [Int64] = pref.favoritePlayerIds // may be empty
-    ///     return try Player.fetchAll(db, ids: playerIds)
-    /// }
+    ///     ```swift
+    ///     // Optimized observation that implicitly tracks the
+    ///     // 'appConfiguration' table, and explicitly tracks 'food'
+    ///     // and 'beverage':
+    ///     let observation = ValueObservation.trackingConstantRegion { db -> Int in
+    ///         try db.registerAccess(to: Food.all())
+    ///         try db.registerAccess(to: Beverage.all())
     ///
-    /// let observation = ValueObservation.trackingConstantRegion { db -> Int in
-    ///     // Track foods and beverages so that the observed region does not
-    ///     // depend on preferences.
-    ///     try db.registerAccess(to: Food.all())
-    ///     try db.registerAccess(to: Beverage.all())
-    ///
-    ///     let pref = try Preference.fetchOne(db) ?? .default
-    ///     switch pref.selection {
-    ///     case .food: return try Food.fetchCount(db)
-    ///     case .beverage: return try Beverage.fetchCount(db)
+    ///         let config = try AppConfiguration.find(db)
+    ///         switch config.selection {
+    ///         case .food:
+    ///             return try Food.fetchCount(db)
+    ///         case .beverage:
+    ///             return try Beverage.fetchCount(db)
+    ///         }
     ///     }
-    /// }
-    /// ```
+    ///     ```
     ///
     /// - parameter fetch: The closure that fetches the observed value.
     public static func trackingConstantRegion<Value>(
@@ -1060,50 +749,66 @@ extension ValueObservation {
     ///
     /// ```swift
     /// // Tracks the full database
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     region: .fullDatabase,
     ///     fetch: { db in ... })
     ///
     /// // Tracks the full 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     region: Player.all(),
     ///     fetch: { db in ... })
     ///
     /// // Tracks the full 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     region: Table("player"),
     ///     fetch: { db in ... })
     ///
     /// // Tracks the row with id 42 in the 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     region: Player.filter(id: 42),
     ///     fetch: { db in ... })
     ///
     /// // Tracks the 'score' column in the 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     region: Player.select(Column("score"),
     ///     fetch: { db in ... })
     ///
     /// // Tracks the 'score' column in the 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     region: SQLRequest("SELECT score FROM player"),
     ///     fetch: { db in ... })
     ///
     /// // Tracks both the 'player' and 'team' tables
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     region: Player.all(), Team.all(),
     ///     fetch: { db in ... })
     /// ```
     ///
-    /// - parameter region: A list of observed regions.
+    /// Unlike observations created with ``tracking(_:)``, the returned
+    /// observation can reduce database contention, by not blocking
+    /// database writes when fresh values are fetched. It can also avoid
+    /// fetching fresh values from the main thread, after the database was
+    /// modified on the main thread.
+    ///
+    /// Those scheduling optimizations are only applied when the observation
+    /// is started from a ``DatabasePool``. You can start such an
+    /// observation from a ``DatabaseQueue``, but the optimizations will not
+    /// be applied. The notified values will be the same, though. This makes
+    /// it possible to use a pool in the main application, and an in-memory
+    /// queue in tests and Xcode previews.
+    ///
+    /// - parameter region: A region to observe.
+    /// - parameter otherRegions: A list of supplementary regions
+    ///   to observe.
     /// - parameter fetch: The closure that fetches the observed value.
     public static func tracking<Value>(
-        region: any DatabaseRegionConvertible...,
+        region: any DatabaseRegionConvertible,
+        _ otherRegions: any DatabaseRegionConvertible...,
         fetch: @escaping (Database) throws -> Value)
     -> Self
     where Reducer == ValueReducers.Fetch<Value>
     {
-        tracking(regions: region, fetch: fetch)
+        tracking(regions: [region] + otherRegions, fetch: fetch)
     }
     
     /// Creates a `ValueObservation` that notifies the fetched value whenever
@@ -1116,40 +821,53 @@ extension ValueObservation {
     ///
     /// ```swift
     /// // Tracks the full database
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     regions: [.fullDatabase],
     ///     fetch: { db in ... })
     ///
     /// // Tracks the full 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     regions: [Player.all()],
     ///     fetch: { db in ... })
     ///
     /// // Tracks the full 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     regions: [Table("player")],
     ///     fetch: { db in ... })
     ///
     /// // Tracks the row with id 42 in the 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     regions: [Player.filter(id: 42)],
     ///     fetch: { db in ... })
     ///
     /// // Tracks the 'score' column in the 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     regions: [Player.select(Column("score")],
     ///     fetch: { db in ... })
     ///
     /// // Tracks the 'score' column in the 'player' table
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     regions: [SQLRequest("SELECT score FROM player")],
     ///     fetch: { db in ... })
     ///
     /// // Tracks both the 'player' and 'team' tables
-    /// let observation = ValueObservation.tracking
+    /// let observation = ValueObservation.tracking(
     ///     regions: [Player.all(), Team.all()],
     ///     fetch: { db in ... })
     /// ```
+    ///
+    /// Unlike observations created with ``tracking(_:)``, the returned
+    /// observation can reduce database contention, by not blocking
+    /// database writes when fresh values are fetched. It can also avoid
+    /// fetching fresh values from the main thread, after the database was
+    /// modified on the main thread.
+    ///
+    /// Those scheduling optimizations are only applied when the observation
+    /// is started from a ``DatabasePool``. You can start such an
+    /// observation from a ``DatabaseQueue``, but the optimizations will not
+    /// be applied. The notified values will be the same, though. This makes
+    /// it possible to use a pool in the main application, and an in-memory
+    /// queue in tests and Xcode previews.
     ///
     /// - parameter regions: An array of observed regions.
     /// - parameter fetch: The closure that fetches the observed value.

@@ -103,7 +103,7 @@ class TableRecordTests: GRDBTestCase {
     func testExtendedDatabaseSelection() throws {
         struct Record: TableRecord {
             static let databaseTableName = "t1"
-            static let databaseSelection: [SQLSelectable] = [AllColumns(), Column.rowID]
+            static let databaseSelection: [any SQLSelectable] = [AllColumns(), Column.rowID]
         }
         let dbQueue = try makeDatabaseQueue()
         try dbQueue.inDatabase { db in
@@ -116,7 +116,7 @@ class TableRecordTests: GRDBTestCase {
     func testRestrictedDatabaseSelection() throws {
         struct Record: TableRecord {
             static let databaseTableName = "t1"
-            static let databaseSelection: [SQLSelectable] = [Column("a"), Column("b")]
+            static let databaseSelection: [any SQLSelectable] = [Column("a"), Column("b")]
         }
         let dbQueue = try makeDatabaseQueue()
         try dbQueue.inDatabase { db in
@@ -127,7 +127,7 @@ class TableRecordTests: GRDBTestCase {
     }
     
     func testRecordInAttachedDatabase() throws {
-        #if SQLITE_HAS_CODEC
+        #if GRDBCIPHER_USE_ENCRYPTION
         // Avoid error due to key not being provided:
         // file is not a database - while executing `ATTACH DATABASE...`
         throw XCTSkip("This test does not support encrypted databases")
@@ -185,7 +185,7 @@ class TableRecordTests: GRDBTestCase {
     }
     
     func testCrossAttachedDatabaseAssociation() throws {
-        #if SQLITE_HAS_CODEC
+        #if GRDBCIPHER_USE_ENCRYPTION
         // Avoid error due to key not being provided:
         // file is not a database - while executing `ATTACH DATABASE...`
         throw XCTSkip("This test does not support encrypted databases")

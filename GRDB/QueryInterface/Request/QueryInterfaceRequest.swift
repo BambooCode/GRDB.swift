@@ -100,8 +100,13 @@ extension QueryInterfaceRequest: FetchRequest {
         let associations = relation.prefetchedAssociations
         if associations.isEmpty == false {
             // Eager loading of prefetched associations
-            preparedRequest.supplementaryFetch = { [relation] db, rows in
-                try prefetch(db, associations: associations, from: relation, into: rows)
+            preparedRequest.supplementaryFetch = { [relation] db, rows, willExecuteSupplementaryRequest in
+                try prefetch(
+                    db,
+                    associations: associations,
+                    from: relation,
+                    into: rows,
+                    willExecuteSupplementaryRequest: willExecuteSupplementaryRequest)
             }
         }
         return preparedRequest
@@ -339,6 +344,12 @@ extension QueryInterfaceRequest: OrderedRequest {
             $0.relation = $0.relation.unordered()
         }
     }
+    
+    public func withStableOrder() -> QueryInterfaceRequest<RowDecoder> {
+        with {
+            $0.relation = $0.relation.withStableOrder()
+        }
+    }
 }
 
 extension QueryInterfaceRequest: AggregatingRequest {
@@ -436,7 +447,7 @@ extension QueryInterfaceRequest: DerivableRequest {
         }
     }
     
-    public func with<RowDecoder>(_ cte: CommonTableExpression<RowDecoder>) -> Self {
+    public func with<T>(_ cte: CommonTableExpression<T>) -> Self {
         with {
             $0.relation.ctes[cte.tableName] = cte.cte
         }
@@ -533,7 +544,7 @@ extension QueryInterfaceRequest {
         return try SQLQueryGenerator(relation: relation).makeDeleteStatement(db, selection: selection)
     }
     
-    /// Returns a cursor over the record deleted by a
+    /// Returns a cursor over the records deleted by a
     /// `DELETE RETURNING` statement.
     ///
     /// For example:
@@ -553,7 +564,7 @@ extension QueryInterfaceRequest {
     ///   <https://www.sqlite.org/lang_returning.html>.
     ///
     /// - parameter db: A database connection.
-    /// - returns: A ``RecordCursor`` over deleted records.
+    /// - returns: A ``RecordCursor`` over the deleted records.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
     public func deleteAndFetchCursor(_ db: Database)
     throws -> RecordCursor<RowDecoder>
@@ -636,7 +647,7 @@ extension QueryInterfaceRequest {
     /// - returns: A prepared statement.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
     /// - precondition: `selection` is not empty.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func deleteAndFetchStatement(
         _ db: Database,
         selection: [any SQLSelectable])
@@ -646,7 +657,7 @@ extension QueryInterfaceRequest {
         return try SQLQueryGenerator(relation: relation).makeDeleteStatement(db, selection: selection)
     }
     
-    /// Returns a cursor over the record deleted by a
+    /// Returns a cursor over the records deleted by a
     /// `DELETE RETURNING` statement.
     ///
     /// For example:
@@ -666,9 +677,9 @@ extension QueryInterfaceRequest {
     ///   <https://www.sqlite.org/lang_returning.html>.
     ///
     /// - parameter db: A database connection.
-    /// - returns: A ``RecordCursor`` over deleted records.
+    /// - returns: A ``RecordCursor`` over the deleted records.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func deleteAndFetchCursor(_ db: Database)
     throws -> RecordCursor<RowDecoder>
     where RowDecoder: FetchableRecord & TableRecord
@@ -696,7 +707,7 @@ extension QueryInterfaceRequest {
     /// - parameter db: A database connection.
     /// - returns: An array of deleted records.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func deleteAndFetchAll(_ db: Database)
     throws -> [RowDecoder]
     where RowDecoder: FetchableRecord & TableRecord
@@ -723,7 +734,7 @@ extension QueryInterfaceRequest {
     /// - parameter db: A database connection.
     /// - returns: A set of deleted records.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func deleteAndFetchSet(_ db: Database)
     throws -> Set<RowDecoder>
     where RowDecoder: FetchableRecord & TableRecord & Hashable
@@ -865,7 +876,7 @@ extension QueryInterfaceRequest {
         return updateStatement
     }
     
-    /// Returns a cursor over the record updated by an
+    /// Returns a cursor over the records updated by an
     /// `UPDATE RETURNING` statement.
     ///
     /// For example:
@@ -995,7 +1006,7 @@ extension QueryInterfaceRequest {
     /// - returns: A prepared statement.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
     /// - precondition: `selection` and `assignments` are not empty.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func updateAndFetchStatement(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
@@ -1018,7 +1029,7 @@ extension QueryInterfaceRequest {
         return updateStatement
     }
     
-    /// Returns a cursor over the record updated by an
+    /// Returns a cursor over the records updated by an
     /// `UPDATE RETURNING` statement.
     ///
     /// For example:
@@ -1043,7 +1054,7 @@ extension QueryInterfaceRequest {
     /// - returns: A cursor over the updated records.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
     /// - precondition: `assignments` is not empty.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func updateAndFetchCursor(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
@@ -1081,7 +1092,7 @@ extension QueryInterfaceRequest {
     /// - returns: An array of updated records.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
     /// - precondition: `assignments` is not empty.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func updateAndFetchAll(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
@@ -1114,7 +1125,7 @@ extension QueryInterfaceRequest {
     /// - returns: A set of updated records.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
     /// - precondition: `assignments` is not empty.
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func updateAndFetchSet(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
@@ -1279,6 +1290,90 @@ extension ColumnExpression {
     public static func /= (column: Self, value: some SQLExpressible) -> ColumnAssignment {
         column.set(to: column / value)
     }
+    
+    /// Creates an assignment that applies a bitwise and.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// Column("mask") &= 2
+    /// Column("mask") &= Column("other")
+    /// ```
+    ///
+    /// Usage:
+    ///
+    /// ```swift
+    /// try dbQueue.write { db in
+    ///     // UPDATE player SET score = score & 2
+    ///     try Player.updateAll(db, Column("mask") &= 2)
+    /// }
+    /// ```
+    public static func &= (column: Self, value: some SQLExpressible) -> ColumnAssignment {
+        column.set(to: column & value)
+    }
+    
+    /// Creates an assignment that applies a bitwise or.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// Column("mask") |= 2
+    /// Column("mask") |= Column("other")
+    /// ```
+    ///
+    /// Usage:
+    ///
+    /// ```swift
+    /// try dbQueue.write { db in
+    ///     // UPDATE player SET score = score | 2
+    ///     try Player.updateAll(db, Column("mask") |= 2)
+    /// }
+    /// ```
+    public static func |= (column: Self, value: some SQLExpressible) -> ColumnAssignment {
+        column.set(to: column | value)
+    }
+    
+    /// Creates an assignment that applies a bitwise left shift.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// Column("mask") <<= 2
+    /// Column("mask") <<= Column("other")
+    /// ```
+    ///
+    /// Usage:
+    ///
+    /// ```swift
+    /// try dbQueue.write { db in
+    ///     // UPDATE player SET score = score << 2
+    ///     try Player.updateAll(db, Column("mask") <<= 2)
+    /// }
+    /// ```
+    public static func <<= (column: Self, value: some SQLExpressible) -> ColumnAssignment {
+        column.set(to: column << value)
+    }
+    
+    /// Creates an assignment that applies a bitwise right shift.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// Column("mask") >>= 2
+    /// Column("mask") >>= Column("other")
+    /// ```
+    ///
+    /// Usage:
+    ///
+    /// ```swift
+    /// try dbQueue.write { db in
+    ///     // UPDATE player SET score = score >> 2
+    ///     try Player.updateAll(db, Column("mask") >>= 2)
+    /// }
+    /// ```
+    public static func >>= (column: Self, value: some SQLExpressible) -> ColumnAssignment {
+        column.set(to: column >> value)
+    }
 }
 
 // MARK: - Eager loading of hasMany associations
@@ -1290,11 +1385,14 @@ extension ColumnExpression {
 /// - parameter associations: Prefetched associations.
 /// - parameter originRows: The rows that need to be extended with prefetched rows.
 /// - parameter originQuery: The query that was used to fetch `originRows`.
+/// - parameter willExecuteSupplementaryRequest: A closure executed before a
+///   supplementary fetch is performed.
 private func prefetch(
     _ db: Database,
     associations: [_SQLAssociation],
     from originRelation: SQLRelation,
-    into originRows: [Row]) throws
+    into originRows: [Row],
+    willExecuteSupplementaryRequest: WillExecuteSupplementaryRequest?) throws
 {
     guard let firstOriginRow = originRows.first else {
         // No rows -> no prefetch
@@ -1355,7 +1453,7 @@ private func prefetch(
                 // useless, and we only need to select pivot columns:
                 let originRelation = originRelation
                     .unorderedUnlessLimited() // only preserve ordering in the CTE if limited
-                    .removingChildrenForPrefetchedAssociations()
+                    .removingPrefetchedAssociations()
                     .selectOnly(leftColumns.map { SQLExpression.column($0).sqlSelection })
                 let originCTE = CommonTableExpression(
                     named: "grdb_base",
@@ -1389,6 +1487,10 @@ private func prefetch(
                     annotatedWith: pivotColumns)
             }
             
+            if let willExecuteSupplementaryRequest {
+                // Support for `Database.dumpRequest`
+                try willExecuteSupplementaryRequest(.init(prefetchRequest), association.keyPath)
+            }
             let prefetchedRows = try prefetchRequest.fetchAll(db)
             let prefetchedGroups = prefetchedRows.grouped(byDatabaseValuesOnColumns: pivotColumns.map { "grdb_\($0)" })
             let groupingIndexes = firstOriginRow.indexes(forColumns: leftColumns)

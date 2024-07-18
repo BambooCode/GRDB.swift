@@ -19,12 +19,12 @@ private struct C: TableRecord {
 
 private struct RestrictedC : TableRecord {
     static let databaseTableName = "c"
-    static let databaseSelection: [SQLSelectable] = [Column("name")]
+    static let databaseSelection: [any SQLSelectable] = [Column("name")]
 }
 
 private struct ExtendedC : TableRecord {
     static let databaseTableName = "c"
-    static let databaseSelection: [SQLSelectable] = [AllColumns(), Column.rowID]
+    static let databaseSelection: [any SQLSelectable] = [AllColumns(), Column.rowID]
 }
 
 /// Test SQL generation
@@ -38,11 +38,11 @@ class AssociationHasOneThroughSQLDerivationTests: GRDBTestCase {
             }
             try db.create(table: "b") { t in
                 t.autoIncrementedPrimaryKey("id")
-                t.column("cId").references("c")
+                t.belongsTo("c")
             }
             try db.create(table: "a") { t in
                 t.autoIncrementedPrimaryKey("id")
-                t.column("bId").references("b")
+                t.belongsTo("b")
             }
         }
     }

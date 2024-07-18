@@ -83,7 +83,9 @@ do {
 - ``acceptsDoubleQuotedStringLiterals``
 - ``busyMode``
 - ``foreignKeysEnabled``
+- ``journalMode``
 - ``readonly``
+- ``JournalModeConfiguration``
 
 ### Configuring GRDB Connections
 
@@ -92,8 +94,11 @@ do {
 - ``label``
 - ``maximumReaderCount``
 - ``observesSuspensionNotifications``
+- ``persistentReadOnlyConnections``
 - ``prepareDatabase(_:)``
 - ``publicStatementArguments``
+- ``transactionClock``
+- ``TransactionClock``
 
 ### Configuring the Quality of Service
 

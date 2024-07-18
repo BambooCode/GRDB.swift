@@ -136,7 +136,7 @@ private struct DatabaseValueDecodingContainer: SingleValueDecodingContainer {
     ///   cannot be converted to the requested type.
     /// - throws: `DecodingError.valueNotFound` if the encountered encoded value is null.
     func decode<T>(_ type: T.Type) throws -> T where T: Decodable {
-        if let type = T.self as? DatabaseValueConvertible.Type {
+        if let type = T.self as? any DatabaseValueConvertible.Type {
             // Prefer DatabaseValueConvertible decoding over Decodable.
             // This allows custom database decoding, such as decoding Date from
             // String, for example.
@@ -179,11 +179,7 @@ extension DatabaseValueConvertible where Self: Decodable {
             guard let data = Data.fromDatabaseValue(databaseValue) else {
                 return nil
             }
-            let decoder = JSONDecoder()
-            decoder.dataDecodingStrategy = .base64
-            decoder.dateDecodingStrategy = .millisecondsSince1970
-            decoder.nonConformingFloatDecodingStrategy = .throw
-            return try? decoder.decode(Self.self, from: data)
+            return try? databaseJSONDecoder().decode(Self.self, from: data)
         } catch {
             return nil
         }

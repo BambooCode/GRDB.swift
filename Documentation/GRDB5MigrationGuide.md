@@ -197,7 +197,7 @@ The changes can quite impact your application. We'll describe them below, as wel
         scheduling: .immediate,
         onError: { error in ... },
         onChange: { [weak self] (players: [Player]) in
-            guard let self = self else { return }
+            guard let self else { return }
             self.updateView(players)
         })
     // <- Here the view has already been updated.
@@ -397,7 +397,9 @@ let publisher = observation
      
     // NEW: GRDB 5
     let query: SQL = "UPDATE player SET name = \(name) WHERE id = \(id)"
-    let (sql, arguments) = try dbQueue.read(query.build)
+    let (sql, arguments) = try dbQueue.read { db in
+        try query.build(db)
+    }
     print(sql)             // prints "UPDATE player SET name = ? WHERE id = ?"
     print(arguments)       // prints ["O'Brien", 42]
     ```

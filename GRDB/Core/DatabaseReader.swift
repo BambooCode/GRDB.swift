@@ -17,6 +17,7 @@ import Dispatch
 /// ### Database Information
 ///
 /// - ``configuration``
+/// - ``path``
 ///
 /// ### Reading from the Database
 ///
@@ -32,6 +33,16 @@ import Dispatch
 /// - ``unsafeReentrantRead(_:)``
 /// - ``asyncUnsafeRead(_:)``
 ///
+/// ### Printing Database Content
+///
+/// - ``dumpContent(format:to:)``
+/// - ``dumpRequest(_:format:to:)``
+/// - ``dumpSchema(to:)``
+/// - ``dumpSQL(_:format:to:)``
+/// - ``dumpTables(_:format:tableHeader:stableOrder:to:)``
+/// - ``DumpFormat``
+/// - ``DumpTableHeaderOptions``
+///
 /// ### Other Database Operations
 ///
 /// - ``backup(to:pagesPerStep:progress:)``
@@ -45,6 +56,12 @@ public protocol DatabaseReader: AnyObject, Sendable {
     
     /// The database configuration.
     var configuration: Configuration { get }
+    
+    /// The path to the database file.
+    ///
+    /// In-memory databases also have a path:
+    /// see [In-Memory Databases](https://www.sqlite.org/inmemorydb.html).
+    var path: String { get }
     
     /// Closes the database connection.
     ///
@@ -441,7 +458,7 @@ extension DatabaseReader {
     /// - parameter value: A closure which accesses the database.
     /// - throws: The error thrown by `value`, or any ``DatabaseError`` that
     ///   would happen while establishing the database access.
-    @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     public func read<T>(_ value: @Sendable @escaping (Database) throws -> T) async throws -> T {
         try await withUnsafeThrowingContinuation { continuation in
             asyncRead { result in
@@ -487,7 +504,7 @@ extension DatabaseReader {
     /// - parameter value: A closure which accesses the database.
     /// - throws: The error thrown by `value`, or any ``DatabaseError`` that
     ///   would happen while establishing the database access.
-    @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     public func unsafeRead<T>(_ value: @Sendable @escaping (Database) throws -> T) async throws -> T {
         try await withUnsafeThrowingContinuation { continuation in
             asyncUnsafeRead { result in
@@ -532,7 +549,7 @@ extension DatabaseReader {
     ///
     /// - parameter scheduler: A Combine Scheduler.
     /// - parameter value: A closure which accesses the database.
-    @available(OSX 10.15, iOS 13, tvOS 13, watchOS 6, *)
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     public func readPublisher<Output>(
         receiveOn scheduler: some Combine.Scheduler = DispatchQueue.main,
         value: @escaping (Database) throws -> Output)
@@ -550,7 +567,7 @@ extension DatabaseReader {
     }
 }
 
-@available(OSX 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension DatabasePublishers {
     /// A publisher that reads from the database.
     ///
@@ -569,7 +586,7 @@ extension DatabasePublishers {
     }
 }
 
-@available(OSX 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension Publisher where Failure == Error {
     fileprivate func eraseToReadPublisher() -> DatabasePublishers.Read<Output> {
         .init(upstream: eraseToAnyPublisher())
@@ -642,6 +659,10 @@ public final class AnyDatabaseReader {
 extension AnyDatabaseReader: DatabaseReader {
     public var configuration: Configuration {
         base.configuration
+    }
+    
+    public var path: String {
+        base.path
     }
     
     public func close() throws {

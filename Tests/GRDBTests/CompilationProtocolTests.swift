@@ -27,13 +27,13 @@ private struct UserDatabaseAggregate1 : DatabaseAggregate {
     let a: Int?
     init() { a = nil }
     mutating func step(_ dbValues: [DatabaseValue]) throws { }
-    func finalize() throws -> DatabaseValueConvertible? { preconditionFailure() }
+    func finalize() throws -> (any DatabaseValueConvertible)? { preconditionFailure() }
 }
 
 private class UserDatabaseAggregate2 : DatabaseAggregate {
     required init() { }
     func step(_ dbValues: [DatabaseValue]) throws { }
-    func finalize() throws -> DatabaseValueConvertible? { preconditionFailure() }
+    func finalize() throws -> (any DatabaseValueConvertible)? { preconditionFailure() }
 }
 
 // MARK: - DatabaseValueConvertible
@@ -52,7 +52,7 @@ private class UserDatabaseValueConvertible2 : DatabaseValueConvertible {
 
 #if SQLITE_ENABLE_FTS5
 private class UserFTS5Tokenizer : FTS5Tokenizer {
-    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<Int8>?, nText: CInt, tokenCallback: @escaping FTS5TokenCallback) -> CInt { preconditionFailure() }
+    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<CChar>?, nText: CInt, tokenCallback: @escaping FTS5TokenCallback) -> CInt { preconditionFailure() }
 }
 #endif
 
@@ -62,7 +62,7 @@ private class UserFTS5Tokenizer : FTS5Tokenizer {
 private class UserFTS5CustomTokenizer : FTS5CustomTokenizer {
     static let name: String = "UserFTS5CustomTokenizer"
     required init(db: Database, arguments: [String]) throws { preconditionFailure() }
-    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<Int8>?, nText: CInt, tokenCallback: @escaping FTS5TokenCallback) -> CInt { preconditionFailure() }
+    func tokenize(context: UnsafeMutableRawPointer?, tokenization: FTS5Tokenization, pText: UnsafePointer<CChar>?, nText: CInt, tokenCallback: @escaping FTS5TokenCallback) -> CInt { preconditionFailure() }
 }
 #endif
 
@@ -71,7 +71,7 @@ private class UserFTS5CustomTokenizer : FTS5CustomTokenizer {
 #if SQLITE_ENABLE_FTS5
 private class UserFTS5WrapperTokenizer : FTS5WrapperTokenizer {
     static let name: String = "UserFTS5WrapperTokenizer"
-    var wrappedTokenizer: FTS5Tokenizer { preconditionFailure() }
+    var wrappedTokenizer: any FTS5Tokenizer { preconditionFailure() }
     required init(db: Database, arguments: [String]) throws { preconditionFailure() }
     func accept(token: String, flags: FTS5TokenFlags, for tokenization: FTS5Tokenization, tokenCallback: (String, FTS5TokenFlags) throws -> ()) throws { preconditionFailure() }
 }

@@ -126,7 +126,7 @@ extension SQLSpecificExpressible {
     
     /// The `IS` SQL operator.
     public static func === (lhs: (any SQLExpressible)?, rhs: Self) -> SQLExpression {
-        if let lhs = lhs {
+        if let lhs {
             return .compare(.is, lhs.sqlExpression, rhs.sqlExpression)
         } else {
             return .compare(.is, rhs.sqlExpression, .null)
@@ -433,6 +433,75 @@ extension SQLSpecificExpressible {
     /// ```
     public static prefix func ! (value: Self) -> SQLExpression {
         value.sqlExpression.is(.falsey)
+    }
+}
+
+// MARK: - Bitwise Operators (&, |, ~, <<, >>)
+
+extension SQLSpecificExpressible {
+    /// The `&` SQL operator.
+    public static func & (lhs: Self, rhs: some SQLExpressible) -> SQLExpression {
+        .associativeBinary(.bitwiseAnd, [lhs.sqlExpression, rhs.sqlExpression])
+    }
+    
+    /// The `&` SQL operator.
+    public static func & (lhs: some SQLExpressible, rhs: Self) -> SQLExpression {
+        .associativeBinary(.bitwiseAnd, [lhs.sqlExpression, rhs.sqlExpression])
+    }
+    
+    /// The `&` SQL operator.
+    public static func & (lhs: Self, rhs: some SQLSpecificExpressible) -> SQLExpression {
+        .associativeBinary(.bitwiseAnd, [lhs.sqlExpression, rhs.sqlExpression])
+    }
+    
+    /// The `|` SQL operator.
+    public static func | (lhs: Self, rhs: some SQLExpressible) -> SQLExpression {
+        .associativeBinary(.bitwiseOr, [lhs.sqlExpression, rhs.sqlExpression])
+    }
+    
+    /// The `|` SQL operator.
+    public static func | (lhs: some SQLExpressible, rhs: Self) -> SQLExpression {
+        .associativeBinary(.bitwiseOr, [lhs.sqlExpression, rhs.sqlExpression])
+    }
+    
+    /// The `|` SQL operator.
+    public static func | (lhs: Self, rhs: some SQLSpecificExpressible) -> SQLExpression {
+        .associativeBinary(.bitwiseOr, [lhs.sqlExpression, rhs.sqlExpression])
+    }
+    
+    /// The `<<` SQL operator.
+    public static func << (lhs: Self, rhs: some SQLExpressible) -> SQLExpression {
+        .binary(.leftShift, lhs.sqlExpression, rhs.sqlExpression)
+    }
+    
+    /// The `<<` SQL operator.
+    public static func << (lhs: some SQLExpressible, rhs: Self) -> SQLExpression {
+        .binary(.leftShift, lhs.sqlExpression, rhs.sqlExpression)
+    }
+    
+    /// The `<<` SQL operator.
+    public static func << (lhs: Self, rhs: some SQLSpecificExpressible) -> SQLExpression {
+        .binary(.leftShift, lhs.sqlExpression, rhs.sqlExpression)
+    }
+    
+    /// The `>>` SQL operator.
+    public static func >> (lhs: Self, rhs: some SQLExpressible) -> SQLExpression {
+        .binary(.rightShift, lhs.sqlExpression, rhs.sqlExpression)
+    }
+    
+    /// The `>>` SQL operator.
+    public static func >> (lhs: some SQLExpressible, rhs: Self) -> SQLExpression {
+        .binary(.rightShift, lhs.sqlExpression, rhs.sqlExpression)
+    }
+    
+    /// The `>>` SQL operator.
+    public static func >> (lhs: Self, rhs: some SQLSpecificExpressible) -> SQLExpression {
+        .binary(.rightShift, lhs.sqlExpression, rhs.sqlExpression)
+    }
+    
+    /// The `~` SQL operator.
+    public static prefix func ~ (value: Self) -> SQLExpression {
+        .unary(.bitwiseNot, value.sqlExpression)
     }
 }
 

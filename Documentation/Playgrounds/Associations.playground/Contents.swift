@@ -29,10 +29,7 @@ migrator.registerMigration("createLibrary") { db in
     try db.create(table: "book") { t in
         t.autoIncrementedPrimaryKey("id")
         t.column("title", .text).notNull()
-        t.column("authorId", .integer)
-            .notNull()
-            .indexed()
-            .references("author", onDelete: .cascade)
+        t.belongsTo("author", onDelete: .cascade).notNull()
     }
 }
 
@@ -103,7 +100,7 @@ let authorInfo: AuthorInfo? = try dbQueue.read { db in
     let books = try author.books.fetchAll(db)
     return AuthorInfo(author: author, books: books)
 }
-if let authorInfo = authorInfo {
+if let authorInfo {
     print("\(authorInfo.author.name) has written:")
     for book in authorInfo.books {
         print("- \(book.title)")
@@ -126,7 +123,7 @@ let bookInfo: BookInfo? = try dbQueue.read { db in
         .including(required: Book.author)
     return try BookInfo.fetchOne(db, request)
 }
-if let bookInfo = bookInfo {
+if let bookInfo {
     print("\(bookInfo.book.title) was written by \(bookInfo.author.name)")
 }
 

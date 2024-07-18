@@ -130,7 +130,7 @@ let request = Book.including(optional: Book.author)
 let bookInfos = BookInfo.fetchAll(db, request)
 ```
 
-Before we dive in, please remember that associations can not generate all possible SQL queries that involve several tables. You may also *prefer* writing SQL, and this is just OK, because your SQL skills are welcome: see the [Joined Queries Support](../README.md#joined-queries-support) chapter.
+Before we dive in, please remember that associations can not generate all possible SQL queries that involve several tables. You may also *prefer* writing SQL, and this is just OK, because your SQL skills are welcome. The [`splittingRowAdapters(columnCounts:)`](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/splittingrowadapters(columncounts:)) method can help you consume the rows fetched from joined queries, as in `SELECT book.*, author.* FROM ...`.
 
 
 ## Required Protocols
@@ -429,15 +429,13 @@ The matching [migration] would look like:
 migrator.registerMigration("Employees") { db in
     try db.create(table: "employee") { t in
         t.autoIncrementedPrimaryKey("id")
-        t.column("managerId", .integer)
-            .indexed()
-            .references("employee", onDelete: .restrict)
+        t.belongsTo("manager", inTable: "employee", onDelete: .setNull)
         t.column("name", .text)
     }
 }
 ```
 
-Note that both sides of the self-join use a customized **[association key](#the-structure-of-a-joined-request)**. This helps consuming this association. For example:
+Note that the associations on both sides of the self-join use a customized **[association key](#the-structure-of-a-joined-request)**. This helps consuming this association. For example:
 
 ```swift
 struct EmployeeInfo: FetchableRecord, Decodable {
@@ -536,20 +534,16 @@ migrator.registerMigration("Books and Authors") { db in
     }
     try db.create(table: "book") { t in
         t.autoIncrementedPrimaryKey("id")
-        t.column("authorId", .integer)                // (2)
+        t.belongsTo("author", onDelete: .cascade)     // (2)
             .notNull()                                // (3)
-            .indexed()                                // (4)
-            .references("author", onDelete: .cascade) // (5)
         t.column("title", .text)
     }
 }
 ```
 
 1. The `author` table has a primary key.
-2. The `book.authorId` column is used to link a book to the author it belongs to.
+2. The `book.authorId` column is used to link a book to the author it belongs to. This column is indexed in order to ease the selection of an author's books. A foreign key is defined from `book.authorId` column to `authors.id`, so that SQLite guarantees that no book refers to a missing author. The `onDelete: .cascade` option has SQLite automatically delete all of an author's books when that author is deleted. See [Foreign Key Actions] for more information.
 3. Make the `book.authorId` column not null if you want SQLite to guarantee that all books have an author.
-4. Create an index on the `book.authorId` column in order to ease the selection of an author's books.
-5. Create a foreign key from `book.authorId` column to `authors.id`, so that SQLite guarantees that no book refers to a missing author. The `onDelete: .cascade` option has SQLite automatically delete all of an author's books when that author is deleted. See [Foreign Key Actions] for more information.
 
 The example above uses auto-incremented primary keys. But generally speaking, all primary keys are supported, including composite primary keys that span several columns.
 
@@ -595,20 +589,16 @@ migrator.registerMigration("Books and Authors") { db in
     }
     try db.create(table: "book") { t in
         t.autoIncrementedPrimaryKey("id")
-        t.column("authorId", .integer)                // (2)
+        t.belongsTo("author", onDelete: .cascade)     // (2)
             .notNull()                                // (3)
-            .indexed()                                // (4)
-            .references("author", onDelete: .cascade) // (5)
         t.column("title", .text)
     }
 }
 ```
 
 1. The `author` table has a primary key.
-2. The `book.authorId` column is used to link a book to the author it belongs to.
+2. The `book.authorId` column is used to link a book to the author it belongs to. This column is indexed in order to ease the selection of an author's books. A foreign key is defined from `book.authorId` column to `authors.id`, so that SQLite guarantees that no book refers to a missing author. The `onDelete: .cascade` option has SQLite automatically delete all of an author's books when that author is deleted. See [Foreign Key Actions] for more information.
 3. Make the `book.authorId` column not null if you want SQLite to guarantee that all books have an author.
-4. Create an index on the `book.authorId` column in order to ease the selection of an author's books.
-5. Create a foreign key from `book.authorId` column to `authors.id`, so that SQLite guarantees that no book refers to a missing author. The `onDelete: .cascade` option has SQLite automatically delete all of an author's books when that author is deleted. See [Foreign Key Actions] for more information.
 
 The example above uses auto-incremented primary keys. But generally speaking, all primary keys are supported, including composite primary keys that span several columns.
 
@@ -654,10 +644,9 @@ migrator.registerMigration("Countries") { db in
     }
     try db.create(table: "demographics") { t in
         t.autoIncrementedPrimaryKey("id")
-        t.column("countryCode", .text)                 // (2)
+        t.belongsTo("country", onDelete: .cascade)     // (2)
             .notNull()                                 // (3)
             .unique()                                  // (4)
-            .references("country", onDelete: .cascade) // (5)
         t.column("population", .integer)
         t.column("density", .double)
     }
@@ -665,10 +654,9 @@ migrator.registerMigration("Countries") { db in
 ```
 
 1. The `country` table has a primary key.
-2. The `demographics.countryCode` column is used to link a demographic profile to the country it belongs to.
+2. The `demographics.countryCode` column is used to link a demographic profile to the country it belongs to. This column is indexed in order to ease the selection of the demographics of a country. A foreign key is defined from `demographics.countryCode` column to `country.code`, so that SQLite guarantees that no profile refers to a missing country. The `onDelete: .cascade` option has SQLite automatically delete a profile when its country is deleted. See [Foreign Key Actions] for more information.
 3. Make the `demographics.countryCode` column not null if you want SQLite to guarantee that all profiles are linked to a country.
 4. Create a unique index on the `demographics.countryCode` column in order to guarantee the unicity of any country's profile.
-5. Create a foreign key from `demographics.countryCode` column to `country.code`, so that SQLite guarantees that no profile refers to a missing country. The `onDelete: .cascade` option has SQLite automatically delete a profile when its country is deleted. See [Foreign Key Actions] for more information.
 
 The example above uses a string primary key for the "country" table. But generally speaking, all primary keys are supported, including composite primary keys that span several columns.
 
@@ -719,6 +707,22 @@ struct Author: TableRecord {
 Sometimes the database schema does not define any foreign key. And sometimes, there are *several* foreign keys from a table to another.
 
 ![AmbiguousForeignKeys](https://cdn.rawgit.com/groue/GRDB.swift/master/Documentation/Images/Associations2/AmbiguousForeignKeys.svg)
+
+```swift
+// The migration that has created the above schema
+migrator.registerMigration("Library") { db in
+    try db.create(table: "person") { t in
+        t.autoIncrementedPrimaryKey("id")
+        t.column("name", .text)
+    }
+    try db.create(table: "book") { t in
+        t.autoIncrementedPrimaryKey("id")
+        t.belongsTo("author", inTable: "person")
+        t.belongsTo("translator", inTable: "person")
+        t.column("title", .text)
+    }
+}
+```
 
 When this happens, associations can't be automatically inferred from the database schema. GRDB will complain with a fatal error such as "Ambiguous foreign key from book to person", or "Could not infer foreign key from book to person".
 
@@ -2000,7 +2004,7 @@ Each association included in the request can feed a property of the decoded reco
 - [Decoding a Joined Request with a Decodable Record]
 - [Decoding a Joined Request with FetchableRecord]
 - [Debugging Request Decoding]
-- [Good Practices for Designing Record Types] - in this general guide about records, check out the "Compose Records" chapter.
+- [Recommended Practices for Designing Record Types] - in this general guide about records, check out the "Associations" chapter.
 
 
 ## The Structure of a Joined Request
@@ -2657,7 +2661,7 @@ Aggregates can be modified and combined with Swift operators:
     let request = Team.annotated(with: Team.players.min(Column("score")) ?? 0)
     ```
 
-- SQL functions `ABS` and `LENGTH` are available as the `abs` and `length` Swift functions:
+- SQL functions `ABS`, `CAST`, and `LENGTH` are available as the `abs`, `cast`, and `length` Swift functions:
 
     <details>
         <summary>SQL</summary>
@@ -2860,7 +2864,7 @@ extension DerivableRequest<Book> {
 }
 ```
 
-See [Good Practices for Designing Record Types] for more information.
+See [Recommended Practices for Designing Record Types] for more information.
 
 
 ## Known Issues
@@ -2907,8 +2911,6 @@ See [Good Practices for Designing Record Types] for more information.
             .including(required: Passport.citizen))
     ```
 
-Come [discuss](http://twitter.com/groue) for more information, or if you wish to help turning those missing features into reality.
-
 ---
 
 This documentation owns a lot to the [Active Record Associations](http://guides.rubyonrails.org/association_basics.html) guide, which is an immensely well-written introduction to database relations. Many thanks to the Rails team and contributors.
@@ -2919,7 +2921,7 @@ This documentation owns a lot to the [Active Record Associations](http://guides.
 
 **GRDB**
 
-Copyright (C) 2015-2020 Gwendal Roué
+Copyright (C) 2015-2023 Gwendal Roué
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -2998,10 +3000,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 [Isolation of Multiple Aggregates]: #isolation-of-multiple-aggregates
 [DerivableRequest Protocol]: #derivablerequest-protocol
 [Known Issues]: #known-issues
-[Row Adapters]: ../README.md#row-adapters
+[Row Adapters]: https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/rowadapter
 [query interface requests]: ../README.md#requests
 [TableRecord]: ../README.md#tablerecord-protocol
-[Good Practices for Designing Record Types]: GoodPracticesForDesigningRecordTypes.md
+[Recommended Practices for Designing Record Types]: https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/recordrecommendedpractices
 [regular aggregating methods]: ../README.md#fetching-aggregated-values
 [Record class]: ../README.md#record-class
 [EncodableRecord]: ../README.md#persistablerecord-protocol

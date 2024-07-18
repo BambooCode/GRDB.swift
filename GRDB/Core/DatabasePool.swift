@@ -13,6 +13,9 @@ public final class DatabasePool {
     
     @LockedBox var databaseSnapshotCount = 0
     
+    /// If Database Suspension is enabled, this array contains the necessary `NotificationCenter` observers.
+    private var suspensionObservers: [NSObjectProtocol] = []
+    
     // MARK: - Database Information
     
     public var configuration: Configuration {
@@ -72,31 +75,12 @@ public final class DatabasePool {
                     purpose: "reader.\(readerCount)")
             })
         
-        // Activate WAL Mode unless readonly
+        // Set up journal mode unless readonly
         if !configuration.readonly {
-            try writer.sync { db in
-                let journalMode = try String.fetchOne(db, sql: "PRAGMA journal_mode = WAL")
-                guard journalMode == "wal" else {
-                    throw DatabaseError(message: "could not activate WAL Mode at path: \(path)")
-                }
-                
-                // https://www.sqlite.org/pragma.html#pragma_synchronous
-                // > Many applications choose NORMAL when in WAL mode
-                try db.execute(sql: "PRAGMA synchronous = NORMAL")
-                
-                if !FileManager.default.fileExists(atPath: path + "-wal") {
-                    // Create the -wal file if it does not exist yet. This
-                    // avoids an SQLITE_CANTOPEN (14) error whenever a user
-                    // opens a pool to an existing non-WAL database, and
-                    // attempts to read from it.
-                    // See https://github.com/groue/GRDB.swift/issues/102
-                    try db.inSavepoint {
-                        try db.execute(sql: """
-                            CREATE TABLE grdb_issue_102 (id INTEGER PRIMARY KEY);
-                            DROP TABLE grdb_issue_102;
-                            """)
-                        return .commit
-                    }
+            switch configuration.journalMode {
+            case .default, .wal:
+                try writer.sync {
+                    try $0.setUpWALMode()
                 }
             }
         }
@@ -113,10 +97,13 @@ public final class DatabasePool {
     }
     
     deinit {
+        // Remove block-based Notification observers.
+        suspensionObservers.forEach(NotificationCenter.default.removeObserver(_:))
+        
         // Undo job done in setupMemoryManagement()
         //
         // https://developer.apple.com/library/mac/releasenotes/Foundation/RN-Foundation/index.html#10_11Error
-        // Explicit unregistration is required before OS X 10.11.
+        // Explicit unregistration is required before macOS 10.11.
         NotificationCenter.default.removeObserver(self)
         
         // Close reader connections before the writer connection.
@@ -161,18 +148,21 @@ public final class DatabasePool {
     }
 }
 
-// @unchecked because of databaseSnapshotCount and readerPool
+// @unchecked because of databaseSnapshotCount, readerPool and suspensionObservers
 extension DatabasePool: @unchecked Sendable { }
 
 extension DatabasePool {
     
     // MARK: - Memory management
     
-    /// Frees as much memory as possible, by disposing non-essential memory from
-    /// the writer connection, and closing all reader connections.
+    /// Frees as much memory as possible, by disposing non-essential memory.
     ///
     /// This method is synchronous, and blocks the current thread until all
     /// database accesses are completed.
+    ///
+    /// This method closes all read-only connections, unless the
+    /// ``Configuration/persistentReadOnlyConnections`` configuration flag
+    /// is set.
     ///
     /// - warning: This method can prevent concurrent reads from executing,
     ///   until it returns. Prefer ``releaseMemoryEventually()`` if you intend
@@ -181,34 +171,50 @@ extension DatabasePool {
         // Release writer memory
         writer.sync { $0.releaseMemory() }
         
-        // Release readers memory by closing all connections.
-        //
-        // We must use a barrier in order to guarantee that memory has been
-        // freed (reader connections closed) when the method exits, as
-        // documented.
-        //
-        // Without the barrier, connections would only close _eventually_ (after
-        // their eventual concurrent jobs have completed).
-        readerPool?.barrier {
-            readerPool?.removeAll()
+        if configuration.persistentReadOnlyConnections {
+            // Keep existing readers
+            readerPool?.forEach { reader in
+                reader.sync { $0.releaseMemory() }
+            }
+        } else {
+            // Release readers memory by closing all connections.
+            //
+            // We must use a barrier in order to guarantee that memory has been
+            // freed (reader connections closed) when the method exits, as
+            // documented.
+            //
+            // Without the barrier, connections would only close _eventually_ (after
+            // their eventual concurrent jobs have completed).
+            readerPool?.barrier {
+                readerPool?.removeAll()
+            }
         }
     }
     
-    /// Eventually frees as much memory as possible, by disposing non-essential
-    /// memory from the writer connection, and closing all reader connections.
+    /// Eventually frees as much memory as possible, by disposing
+    /// non-essential memory.
+    ///
+    /// This method eventually closes all read-only connections, unless the
+    /// ``Configuration/persistentReadOnlyConnections`` configuration flag
+    /// is set.
     ///
     /// Unlike ``releaseMemory()``, this method does not prevent concurrent
     /// database accesses when it is executing. But it does not notify when
     /// non-essential memory has been freed.
     public func releaseMemoryEventually() {
-        // Release readers memory by eventually closing all reader connections
-        // (they will close after their current jobs have completed).
-        readerPool?.removeAll()
+        if configuration.persistentReadOnlyConnections {
+            // Keep existing readers
+            readerPool?.forEach { reader in
+                reader.async { $0.releaseMemory() }
+            }
+        } else {
+            // Release readers memory by eventually closing all reader connections
+            // (they will close after their current jobs have completed).
+            readerPool?.removeAll()
+        }
         
         // Release writer memory eventually.
-        writer.async { db in
-            db.releaseMemory()
-        }
+        writer.async { $0.releaseMemory() }
     }
     
     #if os(iOS)
@@ -318,27 +324,19 @@ extension DatabasePool: DatabaseReader {
     private func setupSuspension() {
         if configuration.observesSuspensionNotifications {
             let center = NotificationCenter.default
-            center.addObserver(
-                self,
-                selector: #selector(DatabasePool.suspend(_:)),
-                name: Database.suspendNotification,
-                object: nil)
-            center.addObserver(
-                self,
-                selector: #selector(DatabasePool.resume(_:)),
-                name: Database.resumeNotification,
-                object: nil)
+            suspensionObservers.append(center.addObserver(
+                forName: Database.suspendNotification,
+                object: nil,
+                queue: nil,
+                using: { [weak self] _ in self?.suspend() }
+            ))
+            suspensionObservers.append(center.addObserver(
+                forName: Database.resumeNotification,
+                object: nil,
+                queue: nil,
+                using: { [weak self] _ in self?.resume() }
+            ))
         }
-    }
-    
-    @objc
-    private func suspend(_ notification: Notification) {
-        suspend()
-    }
-    
-    @objc
-    private func resume(_ notification: Notification) {
-        resume()
     }
     
     // MARK: - Reading from Database
@@ -361,7 +359,7 @@ extension DatabasePool: DatabaseReader {
     
     public func asyncRead(_ value: @escaping (Result<Database, Error>) -> Void) {
         guard let readerPool else {
-            value(.failure(DatabaseError(resultCode: .SQLITE_MISUSE, message: "Connection is closed")))
+            value(.failure(DatabaseError.connectionIsClosed()))
             return
         }
         
@@ -405,7 +403,7 @@ extension DatabasePool: DatabaseReader {
     
     public func asyncUnsafeRead(_ value: @escaping (Result<Database, Error>) -> Void) {
         guard let readerPool else {
-            value(.failure(DatabaseError(resultCode: .SQLITE_MISUSE, message: "Connection is closed")))
+            value(.failure(DatabaseError.connectionIsClosed()))
             return
         }
         
@@ -608,8 +606,12 @@ extension DatabasePool: DatabaseReader {
     /// After this method is called, read-only database access methods will use
     /// new SQLite connections.
     ///
-    /// Eventual concurrent read-only accesses are not invalidated: they will
+    /// Eventual concurrent read-only accesses are not interrupted, and
     /// proceed until completion.
+    ///
+    /// - This method closes all read-only connections, even if the
+    /// ``Configuration/persistentReadOnlyConnections`` configuration flag
+    /// is set.
     public func invalidateReadOnlyConnections() {
         readerPool?.removeAll()
     }
@@ -639,6 +641,50 @@ extension DatabasePool: DatabaseReader {
         // in the pool, and thus still relevant for our check:
         return readers.first { $0.onValidQueue }
     }
+    
+    // MARK: - WAL Snapshot Transactions
+    
+    // swiftlint:disable:next line_length
+#if SQLITE_ENABLE_SNAPSHOT || (!GRDBCUSTOMSQLITE && !GRDBCIPHER && (compiler(>=5.7.1) || !(os(macOS) || targetEnvironment(macCatalyst))))
+    /// Returns a long-lived WAL snapshot transaction on a reader connection.
+    func walSnapshotTransaction() throws -> WALSnapshotTransaction {
+        guard let readerPool else {
+            throw DatabaseError.connectionIsClosed()
+        }
+        
+        let (reader, releaseReader) = try readerPool.get()
+        return try WALSnapshotTransaction(onReader: reader, release: { isInsideTransaction in
+            // Discard the connection if the transaction could not be
+            // properly ended. If we'd reuse it, the next read would
+            // fail because we'd fail starting a read transaction.
+            releaseReader(isInsideTransaction ? .discard : .reuse)
+        })
+    }
+    
+    /// Returns a long-lived WAL snapshot transaction on a reader connection.
+    ///
+    /// - important: The `completion` argument is executed in a serial
+    ///   dispatch queue, so make sure you use the transaction asynchronously.
+    func asyncWALSnapshotTransaction(_ completion: @escaping (Result<WALSnapshotTransaction, Error>) -> Void) {
+        guard let readerPool else {
+            completion(.failure(DatabaseError.connectionIsClosed()))
+            return
+        }
+        
+        readerPool.asyncGet { result in
+            completion(result.flatMap { reader, releaseReader in
+                Result {
+                    try WALSnapshotTransaction(onReader: reader, release: { isInsideTransaction in
+                        // Discard the connection if the transaction could not be
+                        // properly ended. If we'd reuse it, the next read would
+                        // fail because we'd fail starting a read transaction.
+                        releaseReader(isInsideTransaction ? .discard : .reuse)
+                    })
+                }
+            })
+        }
+    }
+#endif
     
     // MARK: - Database Observation
     
@@ -833,9 +879,11 @@ extension DatabasePool {
     /// - note: [**🔥 EXPERIMENTAL**](https://github.com/groue/GRDB.swift/blob/master/README.md#what-are-experimental-features)
     ///
     /// A ``DatabaseError`` of code `SQLITE_ERROR` is thrown if the SQLite
-    /// database is not in the [WAL mode](https://www.sqlite.org/wal.html), or
-    /// if this method is called from a database access where a write
-    /// transaction is open.
+    /// database is not in the [WAL mode](https://www.sqlite.org/wal.html),
+    /// or if this method is called from a write transaction, or if the
+    /// wal file is missing or truncated (size zero).
+    ///
+    /// Related SQLite documentation: <https://www.sqlite.org/c3ref/snapshot_get.html>
     public func makeSnapshotPool() throws -> DatabaseSnapshotPool {
         try unsafeReentrantRead { db in
             try DatabaseSnapshotPool(db)

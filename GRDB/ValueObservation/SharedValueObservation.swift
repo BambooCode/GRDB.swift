@@ -1,7 +1,7 @@
 import Foundation
 
 /// The extent of the shared subscription to a ``SharedValueObservation``.
-public enum SharedValueObservationExtent {
+public enum SharedValueObservationExtent: Sendable {
     /// The ``SharedValueObservation`` starts a single database observation,
     /// which stops when the `SharedValueObservation` is deallocated and all
     /// subscriptions terminated.
@@ -291,7 +291,7 @@ public final class SharedValueObservation<Element> {
     ///     print("fresh players: \(players)")
     /// }
     /// ```
-    @available(OSX 10.15, iOS 13, tvOS 13, watchOS 6, *)
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     public func publisher() -> DatabasePublishers.Value<Element> {
         DatabasePublishers.Value { onError, onChange in
             self.start(onError: onError, onChange: onChange)
@@ -368,7 +368,7 @@ extension SharedValueObservation {
     ///     print("Fresh players: \(players)")
     /// }
     /// ```
-    @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+    @available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
     public func values(bufferingPolicy: AsyncValueObservation<Element>.BufferingPolicy = .unbounded)
     -> AsyncValueObservation<Element>
     {

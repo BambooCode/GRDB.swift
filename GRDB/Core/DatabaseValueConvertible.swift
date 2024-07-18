@@ -1,49 +1,40 @@
-/// A type that can convert itself into and out of a database value.
-///
-/// `DatabaseValueConvertible` is adopted by `Bool`, `Int`, `String`,
-/// `Date`, etc.
-///
-/// To conform to `DatabaseValueConvertible`, provide custom implementations
-/// for ``fromDatabaseValue(_:)-21zzv`` and ``databaseValue-1ob9k``. These
-/// implementations are ready-made for `RawRepresentable` types whose
-/// `RawValue` is `StatementColumnConvertible`, and for `Codable` types.
-///
-/// ## Topics
-///
-/// ### Creating a Value
-///
-/// - ``fromDatabaseValue(_:)-21zzv``
-/// - ``fromMissingColumn()-7iamp``
-///
-/// ### Accessing the DatabaseValue
-///
-/// - ``databaseValue-1ob9k``
-///
-/// ### Fetching Values from Raw SQL
-///
-/// - ``fetchCursor(_:sql:arguments:adapter:)-6elcz``
-/// - ``fetchAll(_:sql:arguments:adapter:)-1cqyb``
-/// - ``fetchSet(_:sql:arguments:adapter:)-5jene``
-/// - ``fetchOne(_:sql:arguments:adapter:)-qvqp``
-///
-/// ### Fetching Values from a Prepared Statement
-///
-/// - ``fetchCursor(_:arguments:adapter:)-4l6af``
-/// - ``fetchAll(_:arguments:adapter:)-3abuc``
-/// - ``fetchSet(_:arguments:adapter:)-6y54n``
-/// - ``fetchOne(_:arguments:adapter:)-3d7ax``
-///
-/// ### Fetching Values from a Request
-///
-/// - ``fetchCursor(_:_:)-8q4r6``
-/// - ``fetchAll(_:_:)-9hkqs``
-/// - ``fetchSet(_:_:)-1foke``
-/// - ``fetchOne(_:_:)-o6yj``
-///
-/// ### Supporting Types
-/// 
-/// - ``DatabaseValueCursor``
-/// - ``StatementBinding``
+import Foundation
+
+// Standard collections `Array`, `Set`, and `Dictionary` do not conform to
+// `DatabaseValueConvertible`, on purpose.
+//
+// Adding `DatabaseValueConvertible` conformance to those collection types
+// would litter JSON values in unexpected places, and foster misuse. For
+// example, it is better when the code below *does not compile*:
+//
+// ```swift
+// // MISUSE: if Array would conform to DatabaseValueConvertible, this
+// // code would compile, and run the incorrect SQLite query
+// // `SELECT ... WHERE id IN ('[1,2,3]')`, instead of the expected
+// // `SELECT ... WHERE id IN (1, 2, 3)`.
+// let ids = [1, 2, 3]
+// let players = try Player.fetchAll(db, sql: """
+//     SELECT * FROM player WHERE id IN (?)
+//     """, arguments: [ids])
+// ```
+//
+// Correct and fostered versions of the code above are:
+//
+// ```swift
+// // CORRECT (explicit SQLite arguments):
+// let ids = [1, 2, 3]
+// let questionMarks = databaseQuestionMarks(count: ids.count) // "?,?,?"
+// let players = try Player.fetchAll(db, sql: """
+//     SELECT * FROM player WHERE id IN (\(questionMarks))
+//     """, arguments: StatementArguments(ids))
+//
+// // CORRECT (SQL interpolation):
+// let ids = [1, 2, 3]
+// let request: SQLRequest<Player> = """
+//     SELECT * FROM player WHERE id IN \(ids)
+//     """
+// let players = try request.fetchAll(db)
+// ```
 public protocol DatabaseValueConvertible: SQLExpressible, StatementBinding {
     /// A database value.
     var databaseValue: DatabaseValue { get }
@@ -70,6 +61,18 @@ public protocol DatabaseValueConvertible: SQLExpressible, StatementBinding {
     ///
     /// - returns: A decoded value, or, if decoding is impossible, nil.
     static func fromMissingColumn() -> Self?
+    
+    /// Returns the `JSONDecoder` that decodes the value.
+    ///
+    /// This method is dedicated to ``DatabaseValueConvertible`` types that 
+    /// also conform to the standard `Decodable` protocol.
+    static func databaseJSONDecoder() -> JSONDecoder
+    
+    /// Returns the `JSONEncoder` that encodes the value.
+    ///
+    /// This method is dedicated to ``DatabaseValueConvertible`` types that
+    /// also conform to the standard `Encodable` protocol.
+    static func databaseJSONEncoder() -> JSONEncoder
 }
 
 extension DatabaseValueConvertible {
@@ -85,6 +88,41 @@ extension DatabaseValueConvertible {
     /// Default implementation fails to decode a value from a missing column.
     public static func fromMissingColumn() -> Self? {
         nil // failure.
+    }
+    
+    /// Returns the `JSONDecoder` that decodes the value.
+    ///
+    /// The default implementation returns a `JSONDecoder` with the
+    /// following properties:
+    ///
+    /// - `dataDecodingStrategy`: `.base64`
+    /// - `dateDecodingStrategy`: `.millisecondsSince1970`
+    /// - `nonConformingFloatDecodingStrategy`: `.throw`
+    public static func databaseJSONDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dataDecodingStrategy = .base64
+        decoder.dateDecodingStrategy = .millisecondsSince1970
+        decoder.nonConformingFloatDecodingStrategy = .throw
+        return decoder
+    }
+    
+    /// Returns the `JSONEncoder` that encodes the value.
+    ///
+    /// The default implementation returns a `JSONEncoder` with the
+    /// following properties:
+    ///
+    /// - `dataEncodingStrategy`: `.base64`
+    /// - `dateEncodingStrategy`: `.millisecondsSince1970`
+    /// - `nonConformingFloatEncodingStrategy`: `.throw`
+    /// - `outputFormatting`: `.sortedKeys`
+    public static func databaseJSONEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dataEncodingStrategy = .base64
+        encoder.dateEncodingStrategy = .millisecondsSince1970
+        encoder.nonConformingFloatEncodingStrategy = .throw
+        // guarantee some stability in order to ease value comparison
+        encoder.outputFormatting = .sortedKeys
+        return encoder
     }
 }
 
@@ -159,7 +197,7 @@ public final class DatabaseValueCursor<Value: DatabaseValueConvertible>: Databas
     
     init(statement: Statement, arguments: StatementArguments? = nil, adapter: (any RowAdapter)? = nil) throws {
         self._statement = statement
-        if let adapter = adapter {
+        if let adapter {
             // adapter may redefine the index of the leftmost column
             columnIndex = try CInt(adapter.baseColumnIndex(atIndex: 0, layout: statement))
         } else {
@@ -167,7 +205,7 @@ public final class DatabaseValueCursor<Value: DatabaseValueConvertible>: Databas
         }
         
         // Assume cursor is created for immediate iteration: reset and set arguments
-        try statement.reset(withArguments: arguments)
+        try statement.prepareExecution(withArguments: arguments)
     }
     
     deinit {
@@ -183,6 +221,11 @@ public final class DatabaseValueCursor<Value: DatabaseValueConvertible>: Databas
             context: RowDecodingContext(statement: _statement, index: Int(columnIndex)))
     }
 }
+
+// Explicit non-conformance to Sendable: database cursors must be used from
+// a serialized database access dispatch queue.
+@available(*, unavailable)
+extension DatabaseValueCursor: Sendable { }
 
 /// DatabaseValueConvertible comes with built-in methods that allow to fetch
 /// cursors, arrays, or single values:

@@ -66,8 +66,8 @@ update_sqlcipher_config() {
 
 update_readme() {
 	current_version="$(git describe --tags --abbrev=0 --exclude=v* origin/SQLCipher)"
-	current_upstream_version="$(grep '\* GRDB' .github/README.md | cut -d '*' -f 3)"
-	current_sqlcipher_version="$(grep '\* SQLCipher' .github/README.md | cut -d '*' -f 3)"
+	current_upstream_version="$(grep '\* GRDB' README.md | cut -d '*' -f 3)"
+	current_sqlcipher_version="$(grep '\* SQLCipher' README.md | cut -d '*' -f 3)"
 	grdb_tag="$(git describe --tags --abbrev=0 --match=v* upstream-master)"
 
 	export new_version upstream_version="${grdb_tag#v}" sqlcipher_version="${sqlcipher_tag#v}"
@@ -80,51 +80,80 @@ update_readme() {
 
 	cat <<- EOF
 
-	DuckDuckGo GRDB.swift current version: ${current_version}
+	Session GRDB.swift current version: ${current_version}
 	Upstream GRDB.swift version: ${current_upstream_version} -> ${upstream_version}
 	SQLCipher version: ${current_sqlcipher_version} -> ${sqlcipher_version}
 	EOF
 
-	while ! [[ "${new_version}" =~ [0-9]\.[0-9]\.[0-9] ]]; do
-		read -rp "Input DuckDuckGo GRDB.swift desired version number (x.y.z): " new_version < /dev/tty
+	while ! [[ "${new_version}" =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; do
+		read -rp "Input Session GRDB.swift desired version number (x.y.z): " new_version < /dev/tty
 	done
 
-	envsubst < "${cwd}/.github/README.md.in" > "${cwd}/.github/README.md"
-	git add "${cwd}/.github/README.md"
+	envsubst < "${cwd}/assets/README.md.in" > "${cwd}/README.md"
+	git add "${cwd}/README.md"
 
-	echo "Updated .github/README.md ✅"
+	echo "Updated README.md ✅"
 }
 
 build_and_test_release() {
-	echo "Testing the build ..."
+	local log_file="${cwd}/.build/Logs/GRDB-${grdb_tag}-unittests.log"
+
+	printf '%s' "Building GRDB ... "
 	rm -rf "${cwd}/.build"
+	mkdir -p "${cwd}/.build/Logs" && touch "${log_file}"
+	
+	if xcodebuild build-for-testing \
+		-project "${cwd}/GRDB.xcodeproj" \
+		-scheme "GRDB" \
+		-derivedDataPath "${cwd}/.build" >"${log_file}" 2>&1; then
+
+		echo "✅"
+	else
+		echo "❌"
+		echo "Failed to build GRDB with SQLCipher support. See log file at ${log_file} for more info."
+		exit 1
+	fi
+
+	echo "Testing GRDB ... ⚙️"
 	# The skipped test references a test database added with a podfile.
 	# We're safe to disable it since we don't care about SQLCipher 3 compatibility anyway.
-	swift test --skip "EncryptionTests.testSQLCipher3Compatibility"
+	if xcodebuild test-without-building \
+		-project "${cwd}/GRDB.xcodeproj" \
+		-scheme "GRDB" \
+		-derivedDataPath "${cwd}/.build" \
+		-skip-testing:GRDBTests/EncryptionTests/testSQLCipher3Compatibility \
+		| tee -a "$log_file" | $log_formatter 2>&1; then
 
-	echo ""
-	swift build -c release
+		echo "Unit tests succeeded ✅"
 
-	cat <<- EOF
+		cat <<- EOF
 
-	SQLCipher ${sqlcipher_tag} is ready to use with GRDB.swift ${grdb_tag} 🎉
+		SQLCipher ${sqlcipher_tag} is ready to use with GRDB.swift ${grdb_tag} 🎉
 
-	EOF
+		EOF
+	else
+		cat <<-EOF
+		Unit tests failed ❌
+		See log file at ${log_file} for more info.
+		Rerun with -f to skip testing.
+		EOF
+		exit 1
+	fi
 }
 
 setup_new_release_branch() {
 	echo "Setting up new release branch ..."
 
-	local release_branch="release/${new_version}"
+	local release_branch="release/Session-${new_version}"
 
 	git checkout -b "$release_branch"
-	git add "${cwd}/.github/README.md" "$sqlcipher_path"
-	git commit -m "DuckDuckGo GRDB.swift ${new_version} (GRDB ${upstream_version}, SQLCipher ${sqlcipher_version})"
+	git add "${cwd}/README.md" "$sqlcipher_path"
+	git commit -m "Session GRDB.swift Session-${new_version} (GRDB ${upstream_version}, SQLCipher ${sqlcipher_version})"
 
 	cat <<- EOF
 
 	Release is prepared on branch ${release_branch}.
-	Push the branch when ready and follow .github/README.md for release instructions.
+	Push the branch when ready and follow README.md for release instructions.
 	EOF
 }
 

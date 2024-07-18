@@ -39,6 +39,7 @@ extension PersistableRecord {
 
 extension PersistableRecord {
 #if GRDBCUSTOMSQLITE || GRDBCIPHER
+    // TODO: GRDB7 make it unable to return an optional
     /// Executes an `INSERT RETURNING` or `UPDATE RETURNING` statement, and
     /// returns a new record built from the saved row.
     ///
@@ -127,6 +128,7 @@ extension PersistableRecord {
         return success.returned
     }
 #else
+    // TODO: GRDB7 make it unable to return an optional
     /// Executes an `INSERT RETURNING` or `UPDATE RETURNING` statement, and
     /// returns a new record built from the saved row.
     ///
@@ -144,7 +146,7 @@ extension PersistableRecord {
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs, or any
     ///   error thrown by the persistence callbacks defined by the record type.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func saveAndFetch<T: FetchableRecord & TableRecord>(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
@@ -189,7 +191,7 @@ extension PersistableRecord {
     ///   error thrown by the persistence callbacks defined by the record type.
     /// - precondition: `selection` is not empty.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func saveAndFetch<T>(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,

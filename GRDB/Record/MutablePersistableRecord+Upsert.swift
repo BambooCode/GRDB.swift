@@ -207,7 +207,7 @@ extension MutablePersistableRecord {
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs, or any
     ///   error thrown by the persistence callbacks defined by the record type.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public mutating func upsert(_ db: Database) throws {
         try willSave(db)
         
@@ -302,7 +302,7 @@ extension MutablePersistableRecord {
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs, or any
     ///   error thrown by the persistence callbacks defined by the record type.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public mutating func upsertAndFetch(
         _ db: Database,
         onConflict conflictTarget: [String] = [],
@@ -330,7 +330,7 @@ extension MutablePersistableRecord {
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs, or any
     ///   error thrown by the persistence callbacks defined by the record type.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public mutating func upsertAndFetch<T: FetchableRecord & TableRecord>(
         _ db: Database,
         as returnedType: T.Type,
@@ -434,6 +434,15 @@ extension MutablePersistableRecord {
             // Rowid is the last column
             let rowid: Int64 = row[row.count - 1]
             let returned = try decode(row)
+            
+            // Now that we have fetched the values we need, we could stop
+            // there. But let's make sure we fully consume the cursor
+            // anyway, until SQLITE_DONE. This is necessary, for example,
+            // for upserts in tables that are synchronized with an
+            // FTS5 table.
+            // See <https://github.com/groue/GRDB.swift/issues/1390>
+            while try cursor.next() != nil { }
+            
             return (rowid, returned)
         }
         
@@ -442,7 +451,7 @@ extension MutablePersistableRecord {
         // to false in its `aroundInsert` callback.
         var persistenceContainer = dao.persistenceContainer
         let rowIDColumn = dao.primaryKey.rowIDColumn
-        if let rowIDColumn = rowIDColumn {
+        if let rowIDColumn {
             persistenceContainer[caseInsensitive: rowIDColumn] = rowid
         }
         

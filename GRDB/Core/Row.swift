@@ -245,6 +245,12 @@ public final class Row {
     }
 }
 
+// Explicit non-conformance to Sendable: a row contains transient
+// information. TODO GRDB7: split non sendable statement rows from sendable
+// copied rows.
+@available(*, unavailable)
+extension Row: Sendable { }
+
 extension Row {
     
     // MARK: - Columns
@@ -682,7 +688,7 @@ extension Row {
     /// ``JoinableRequest/including(optional:)`` request methods define scopes
     /// named after the key of included associations between record types.
     ///
-    /// A depth-first search is performed in all available scopes in the row,
+    /// A breadth-first search is performed in all available scopes in the row,
     /// recursively.
     ///
     /// A fatal error is raised if the scope is not available, or contains only
@@ -726,7 +732,7 @@ extension Row {
     /// ``JoinableRequest/including(optional:)`` request methods define scopes
     /// named after the key of included associations between record types.
     ///
-    /// A depth-first search is performed in all available scopes in the row,
+    /// A breadth-first search is performed in all available scopes in the row,
     /// recursively.
     ///
     /// The result is nil if the scope is not available, or contains only
@@ -879,7 +885,7 @@ extension Row {
     /// A view on the scopes tree defined by row adapters.
     ///
     /// The returned object provides an access to all available scopes in
-    /// the row, recursively. For any given scope identifier, a depth-first
+    /// the row, recursively. For any given scope identifier, a breadth-first
     /// search is performed.
     ///
     /// Row scopes can be defined manually, with ``ScopeAdapter``.
@@ -1152,8 +1158,7 @@ extension Row {
     /// Nil is returned if the scope is not available, or contains only
     /// null values.
     ///
-    /// See <https://github.com/groue/GRDB.swift/blob/master/README.md#joined-queries-support>
-    /// for more information.
+    /// See ``splittingRowAdapters(columnCounts:)`` for a sample code.
     func decodeIfPresent<Record: FetchableRecord>(
         _ type: Record.Type = Record.self,
         forKey scope: String)
@@ -1194,8 +1199,7 @@ extension Row {
     /// A fatal error is raised if the scope is not available, or contains only
     /// null values.
     ///
-    /// See <https://github.com/groue/GRDB.swift/blob/master/README.md#joined-queries-support>
-    /// for more information.
+    /// See ``splittingRowAdapters(columnCounts:)`` for a sample code.
     func decode<Record: FetchableRecord>(
         _ type: Record.Type = Record.self,
         forKey scope: String)
@@ -1366,7 +1370,7 @@ public final class RowCursor: DatabaseCursor {
         self._row = try Row(statement: statement).adapted(with: adapter, layout: statement)
         
         // Assume cursor is created for immediate iteration: reset and set arguments
-        try statement.reset(withArguments: arguments)
+        try statement.prepareExecution(withArguments: arguments)
     }
     
     deinit {
@@ -1378,6 +1382,11 @@ public final class RowCursor: DatabaseCursor {
     @inlinable
     public func _element(sqliteStatement: SQLiteStatement) -> Row { _row }
 }
+
+// Explicit non-conformance to Sendable: database cursors must be used from
+// a serialized database access dispatch queue.
+@available(*, unavailable)
+extension RowCursor: Sendable { }
 
 extension Row {
     
@@ -1741,7 +1750,7 @@ extension Row {
     public static func fetchAll(_ db: Database, _ request: some FetchRequest) throws -> [Row] {
         let request = try request.makePreparedRequest(db, forSingleResult: false)
         let rows = try fetchAll(request.statement, adapter: request.adapter)
-        try request.supplementaryFetch?(db, rows)
+        try request.supplementaryFetch?(db, rows, nil)
         return rows
     }
     
@@ -1774,7 +1783,7 @@ extension Row {
         let request = try request.makePreparedRequest(db, forSingleResult: false)
         if let supplementaryFetch = request.supplementaryFetch {
             let rows = try fetchAll(request.statement, adapter: request.adapter)
-            try supplementaryFetch(db, rows)
+            try supplementaryFetch(db, rows, nil)
             return Set(rows)
         } else {
             return try fetchSet(request.statement, adapter: request.adapter)
@@ -1811,7 +1820,7 @@ extension Row {
         guard let row = try fetchOne(request.statement, adapter: request.adapter) else {
             return nil
         }
-        try request.supplementaryFetch?(db, [row])
+        try request.supplementaryFetch?(db, [row], nil)
         return row
     }
 }
@@ -2061,7 +2070,7 @@ typealias RowIndex = Row.Index
 
 extension Row {
     /// An index to a (column, value) pair in a ``Row``.
-    public struct Index {
+    public struct Index: Sendable {
         let index: Int
         init(_ index: Int) { self.index = index }
     }

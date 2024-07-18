@@ -20,11 +20,13 @@ import Foundation // For JSONEncoder
 /// ### Configuring Persistence for the Standard Encodable Protocol
 ///
 /// - ``databaseColumnEncodingStrategy-5sx4v``
+/// - ``databaseDataEncodingStrategy-9y0c7``
 /// - ``databaseDateEncodingStrategy-2gtc1``
 /// - ``databaseEncodingUserInfo-8upii``
 /// - ``databaseJSONEncoder(for:)-6x62c``
 /// - ``databaseUUIDEncodingStrategy-2t96q``
 /// - ``DatabaseColumnEncodingStrategy``
+/// - ``DatabaseDataEncodingStrategy``
 /// - ``DatabaseDateEncodingStrategy``
 /// - ``DatabaseUUIDEncodingStrategy``
 ///
@@ -35,6 +37,7 @@ import Foundation // For JSONEncoder
 /// ### Comparing Records
 ///
 /// - ``databaseChanges(from:)``
+/// - ``databaseChanges(modify:)``
 /// - ``databaseEquals(_:)``
 public protocol EncodableRecord {
     /// Encodes the record into the provided persistence container.
@@ -113,6 +116,24 @@ public protocol EncodableRecord {
     /// to the standard `Encodable` protocol and use the default
     /// ``encode(to:)-1mrt`` implementation.
     static func databaseJSONEncoder(for column: String) -> JSONEncoder
+    
+    /// The strategy for encoding `Data` columns.
+    ///
+    /// This property is dedicated to ``EncodableRecord`` types that also
+    /// conform to the standard `Encodable` protocol and use the default
+    /// ``encode(to:)-1mrt`` implementation.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// struct Player: EncodableRecord, Encodable {
+    ///     static let databaseDataEncodingStrategy = DatabaseDataEncodingStrategy.text
+    ///
+    ///     // Encoded as SQL text. Data must contain valid UTF8 bytes.
+    ///     var jsonData: Data
+    /// }
+    /// ```
+    static var databaseDataEncodingStrategy: DatabaseDataEncodingStrategy { get }
     
     /// The strategy for encoding `Date` columns.
     ///
@@ -198,6 +219,12 @@ extension EncodableRecord {
         return encoder
     }
     
+    /// Returns the default strategy for encoding `Data` columns:
+    /// ``DatabaseDataEncodingStrategy/deferredToData``.
+    public static var databaseDataEncodingStrategy: DatabaseDataEncodingStrategy {
+        .deferredToData
+    }
+    
     /// Returns the default strategy for encoding `Date` columns:
     /// ``DatabaseDateEncodingStrategy/deferredToDate``.
     public static var databaseDateEncodingStrategy: DatabaseDateEncodingStrategy {
@@ -262,6 +289,37 @@ extension EncodableRecord {
     throws -> [String: DatabaseValue]
     {
         let changes = try PersistenceContainer(self).changesIterator(from: PersistenceContainer(record))
+        return Dictionary(uniqueKeysWithValues: changes)
+    }
+    
+    /// Modifies the record according to the provided `modify` closure, and
+    /// returns a dictionary of changed values.
+    ///
+    /// The keys of the dictionary are the changed column names. Values are
+    /// the database values from the initial version record.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// var player = Player(id: 1, score: 1000, hasAward: false)
+    /// let changes = try player.databaseChanges {
+    ///     $0.score = 1000
+    ///     $0.hasAward = true
+    /// }
+    ///
+    /// player.hasAward     // true (changed)
+    ///
+    /// changes["score"]    // nil (not changed)
+    /// changes["hasAward"] // false (old value)
+    /// ```
+    ///
+    /// - parameter modify: A closure that modifies the record.
+    public mutating func databaseChanges(modify: (inout Self) throws -> Void)
+    throws -> [String: DatabaseValue]
+    {
+        let container = try PersistenceContainer(self)
+        try modify(&self)
+        let changes = try PersistenceContainer(self).changesIterator(from: container)
         return Dictionary(uniqueKeysWithValues: changes)
     }
 }
@@ -388,6 +446,48 @@ extension Row {
     
     convenience init(_ container: PersistenceContainer) {
         self.init(Dictionary(container.storage))
+    }
+}
+
+// MARK: - DatabaseDataEncodingStrategy
+
+/// `DatabaseDataEncodingStrategy` specifies how `EncodableRecord` types that
+/// also adopt the standard `Encodable` protocol encode their `Data` properties
+/// in the default <doc:/documentation/GRDB/EncodableRecord/encode(to:)-1mrt>
+/// implementation.
+///
+/// For example:
+///
+/// ```swift
+/// struct Player: EncodableRecord, Encodable {
+///     static let databaseDataEncodingStrategy = DatabaseDataEncodingStrategy.text
+///
+///     // Encoded as SQL text. Data must contain valid UTF8 bytes.
+///     var jsonData: Data
+/// }
+/// ```
+public enum DatabaseDataEncodingStrategy {
+    /// Encodes `Data` columns as SQL blob.
+    case deferredToData
+    
+    /// Encodes `Data` columns as SQL text. Data must contain valid UTF8 bytes.
+    case text
+    
+    /// Encodes `Data` column as the result of the user-provided function.
+    case custom((Data) -> (any DatabaseValueConvertible)?)
+    
+    func encode(_ data: Data) -> DatabaseValue {
+        switch self {
+        case .deferredToData:
+            return data.databaseValue
+        case .text:
+            guard let string = String(data: data, encoding: .utf8) else {
+                fatalError("Invalid UTF8 data")
+            }
+            return string.databaseValue
+        case .custom(let format):
+            return format(data)?.databaseValue ?? .null
+        }
     }
 }
 

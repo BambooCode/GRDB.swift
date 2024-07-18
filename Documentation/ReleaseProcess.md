@@ -6,7 +6,7 @@ Release Process
 To release a new GRDB version:
 
 - Tests
-    - `make test`
+    - `make distclean test`
     - Build and run GRDBDemoiOS in Release configuration on a device
     - Archive GRDBDemoiOS
     - Check for performance regression with GRDBOSXPerformanceTests
@@ -21,7 +21,6 @@ To release a new GRDB version:
 - Check tag authors: `git for-each-ref --format '%(refname) %(authorname)' refs/tags`
 - Push to the master & development branch
 - `pod trunk push --allow-warnings GRDB.swift.podspec`
-- Update https://github.com/groue/WWDCCompanion
 - Update [performance comparison](https://github.com/groue/GRDB.swift/wiki/Performance):
 
     `make test_performance | Tests/parsePerformanceTests.rb | Tests/generatePerformanceReport.rb`

@@ -58,10 +58,6 @@
 /// - ``makePreparedRequest(_:forSingleResult:)``
 /// - ``PreparedRequest``
 ///
-/// ### Database Observation Support
-///
-/// - ``databaseRegion(_:)``
-///
 /// ### Adapting the Fetched Rows
 ///
 /// - ``adapted(_:)``
@@ -111,6 +107,28 @@ extension FetchRequest {
 
 // MARK: - PreparedRequest
 
+/// A closure executed before a supplementary fetch is performed.
+///
+/// Support for `Database.dumpRequest`.
+///
+/// - parameter request: The supplementary request
+/// - parameter keyPath: The key path target of the supplementary fetch.
+typealias WillExecuteSupplementaryRequest = (_ request: AnyFetchRequest<Row>, _ keyPath: [String]) throws -> Void
+
+/// A closure that performs supplementary fetches.
+///
+/// Support for eager loading of hasMany associations.
+///
+/// - parameter db: A database connection.
+/// - parameter rows: The rows that are modified by the supplementary fetch.
+/// - parameter willExecuteSupplementaryRequest: A closure to execute before
+///   performing supplementary fetches.
+typealias SupplementaryFetch = (
+    _ db: Database,
+    _ rows: [Row],
+    _ willExecuteSupplementaryRequest: WillExecuteSupplementaryRequest?)
+throws -> Void
+
 /// A `PreparedRequest` is a request that is ready to be executed.
 public struct PreparedRequest {
     /// A prepared statement with bound parameters.
@@ -119,19 +137,25 @@ public struct PreparedRequest {
     /// An eventual adapter for rows fetched by the select statement.
     public var adapter: (any RowAdapter)?
     
+    /// A closure that performs supplementary fetches.
     /// Support for eager loading of hasMany associations.
-    var supplementaryFetch: ((Database, [Row]) throws -> Void)?
+    var supplementaryFetch: SupplementaryFetch?
     
     init(
         statement: Statement,
         adapter: (any RowAdapter)?,
-        supplementaryFetch: ((Database, [Row]) throws -> Void)? = nil)
+        supplementaryFetch: SupplementaryFetch? = nil)
     {
         self.statement = statement
         self.adapter = adapter
         self.supplementaryFetch = supplementaryFetch
     }
 }
+
+// Explicit non-conformance to Sendable: `PreparedRequest` contains
+// a statement.
+@available(*, unavailable)
+extension PreparedRequest: Sendable { }
 
 extension PreparedRequest: Refinable { }
 
@@ -141,7 +165,9 @@ extension FetchRequest {
     /// Returns an adapted request.
     ///
     /// The returned request performs an identical database query, but adapts
-    /// the fetched rows. See ``RowAdapter``.
+    /// the fetched rows. See ``RowAdapter``, and
+    /// ``splittingRowAdapters(columnCounts:)`` for a sample code that uses
+    /// `adapted(_:)`.
     ///
     /// - parameter adapter: A closure that accepts a database connection and
     ///   returns a row adapter.
@@ -215,8 +241,8 @@ public struct AnyFetchRequest<RowDecoder> {
     ///
     /// // AnyFetchRequest<Row>
     /// let rowRequest = playerRequest.asRequest(of: Row.self)
-    public func asRequest<RowDecoder>(of type: RowDecoder.Type) -> AnyFetchRequest<RowDecoder> {
-        AnyFetchRequest<RowDecoder>(request: request)
+    public func asRequest<T>(of type: T.Type) -> AnyFetchRequest<T> {
+        AnyFetchRequest<T>(request: request)
     }
 }
 

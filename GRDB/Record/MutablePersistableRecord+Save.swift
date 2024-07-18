@@ -87,6 +87,7 @@ extension MutablePersistableRecord {
 
 extension MutablePersistableRecord {
 #if GRDBCUSTOMSQLITE || GRDBCIPHER
+    // TODO: GRDB7 make it unable to return an optional
     /// Executes an `INSERT RETURNING` or `UPDATE RETURNING` statement, and
     /// returns a new record built from the saved row.
     ///
@@ -121,6 +122,7 @@ extension MutablePersistableRecord {
         return try result.saveAndFetch(db, onConflict: conflictResolution, as: Self.self)
     }
     
+    // TODO: GRDB7 make it unable to return an optional
     /// Executes an `INSERT RETURNING` or `UPDATE RETURNING` statement, and
     /// returns a new record built from the saved row.
     ///
@@ -209,6 +211,7 @@ extension MutablePersistableRecord {
         return success.returned
     }
 #else
+    // TODO: GRDB7 make it unable to return an optional
     /// Executes an `INSERT RETURNING` or `UPDATE RETURNING` statement, and
     /// returns a new record built from the saved row.
     ///
@@ -233,7 +236,7 @@ extension MutablePersistableRecord {
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs, or any
     ///   error thrown by the persistence callbacks defined by the record type.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public func saveAndFetch(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil)
@@ -244,6 +247,7 @@ extension MutablePersistableRecord {
         return try result.saveAndFetch(db, onConflict: conflictResolution, as: Self.self)
     }
     
+    // TODO: GRDB7 make it unable to return an optional
     /// Executes an `INSERT RETURNING` or `UPDATE RETURNING` statement, and
     /// returns a new record built from the saved row.
     ///
@@ -261,7 +265,7 @@ extension MutablePersistableRecord {
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs, or any
     ///   error thrown by the persistence callbacks defined by the record type.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public mutating func saveAndFetch<T: FetchableRecord & TableRecord>(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
@@ -306,7 +310,7 @@ extension MutablePersistableRecord {
     ///   error thrown by the persistence callbacks defined by the record type.
     /// - precondition: `selection` is not empty.
     @inlinable // allow specialization so that empty callbacks are removed
-    @available(iOS 15.0, tvOS 15.0, watchOS 8.0, macOS 12.0, *) // SQLite 3.35.0+
+    @available(iOS 15, macOS 12, tvOS 15, watchOS 8, *) // SQLite 3.35.0+
     public mutating func saveAndFetch<T>(
         _ db: Database,
         onConflict conflictResolution: Database.ConflictResolution? = nil,
@@ -369,15 +373,15 @@ extension MutablePersistableRecord {
     {
         // Attempt at updating if the record has a primary key
         if let key = try primaryKey(db) {
+            let databaseTableName = type(of: self).databaseTableName
             do {
-                let databaseTableName = type(of: self).databaseTableName
                 let columns = try Set(db.columns(in: databaseTableName).map(\.name))
                 return try updateAndFetchWithCallbacks(
                     db, onConflict: conflictResolution,
                     columns: columns,
                     selection: selection,
                     fetch: fetch)
-            } catch RecordError.recordNotFound(databaseTableName: type(of: self).databaseTableName, key: key) {
+            } catch RecordError.recordNotFound(databaseTableName: databaseTableName, key: key) {
                 // No row was updated: fallback on insert.
             }
         }

@@ -19,6 +19,16 @@ extension SQLInterpolation {
         appendLiteral(table.databaseTableName.quotedDatabaseIdentifier)
     }
     
+    /// Appends the table name.
+    ///
+    ///     // SELECT * FROM player
+    ///     let playerTable = Table("player")
+    ///     let request: SQLRequest<Player> = "SELECT * FROM \(playerTable)"
+    @_disfavoredOverload
+    public mutating func appendInterpolation<T>(_ table: Table<T>) {
+        appendLiteral(table.tableName.quotedDatabaseIdentifier)
+    }
+    
     /// Appends the table name of the record.
     ///
     ///     // INSERT INTO player ...
@@ -26,6 +36,15 @@ extension SQLInterpolation {
     ///     let request: SQLRequest<Player> = "INSERT INTO \(tableOf: player) ..."
     public mutating func appendInterpolation(tableOf record: some TableRecord) {
         appendInterpolation(type(of: record))
+    }
+    
+    /// Appends a quoted identifier.
+    ///
+    ///     // INSERT INTO "group" ...
+    ///     let tableName = "group"
+    ///     let request: SQLRequest<Player> = "INSERT INTO \(identifier: tableName) ..."
+    public mutating func appendInterpolation(identifier: String) {
+        appendLiteral(identifier.quotedDatabaseIdentifier)
     }
     
     /// Appends the table name of the record.
@@ -74,7 +93,7 @@ extension SQLInterpolation {
     ///         """
     @_disfavoredOverload
     public mutating func appendInterpolation(_ selection: (any SQLSelectable)?) {
-        if let selection = selection {
+        if let selection {
             elements.append(.selection(selection.sqlSelection))
         } else {
             appendLiteral("NULL")
@@ -127,7 +146,7 @@ extension SQLInterpolation {
     ///         """
     @_disfavoredOverload
     public mutating func appendInterpolation(_ expressible: (any SQLExpressible)?) {
-        if let expressible = expressible {
+        if let expressible {
             elements.append(.expression(expressible.sqlExpression))
         } else {
             appendLiteral("NULL")

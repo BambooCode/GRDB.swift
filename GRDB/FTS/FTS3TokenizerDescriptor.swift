@@ -1,11 +1,11 @@
-/// An ``FTS3`` tokenizer.
+/// The descriptor for an ``FTS3`` tokenizer.
 ///
 /// `FTS3TokenizerDescriptor` can be used in both ``FTS3`` and ``FTS4`` tables.
 ///
 /// For example:
 ///
 /// ```swift
-/// db.create(virtualTable: "book", using: FTS4()) { t in
+/// try db.create(virtualTable: "book", using: FTS4()) { t in
 ///     t.tokenizer = .simple // FTS3TokenizerDescriptor
 /// }
 /// ```
@@ -14,13 +14,13 @@
 ///
 /// ## Topics
 ///
-/// ### Creating Tokenizers
+/// ### Creating Tokenizer Descriptors
 ///
 /// - ``porter``
 /// - ``simple``
 /// - ``unicode61(diacritics:separators:tokenCharacters:)``
 /// - ``FTS3/Diacritics``
-public struct FTS3TokenizerDescriptor {
+public struct FTS3TokenizerDescriptor: Sendable {
     let name: String
     let arguments: [String]
     
@@ -34,7 +34,7 @@ public struct FTS3TokenizerDescriptor {
     /// For example:
     ///
     /// ```swift
-    /// db.create(virtualTable: "book", using: FTS4()) { t in
+    /// try db.create(virtualTable: "book", using: FTS4()) { t in
     ///     t.tokenizer = .simple
     /// }
     /// ```
@@ -47,7 +47,7 @@ public struct FTS3TokenizerDescriptor {
     /// For example:
     ///
     /// ```swift
-    /// db.create(virtualTable: "book", using: FTS4()) { t in
+    /// try db.create(virtualTable: "book", using: FTS4()) { t in
     ///     t.tokenizer = .porter
     /// }
     /// ```
@@ -60,7 +60,7 @@ public struct FTS3TokenizerDescriptor {
     /// For example:
     ///
     /// ```swift
-    /// db.create(virtualTable: "book", using: FTS4()) { t in
+    /// try db.create(virtualTable: "book", using: FTS4()) { t in
     ///     t.tokenizer = .unicode61()
     /// }
     /// ```

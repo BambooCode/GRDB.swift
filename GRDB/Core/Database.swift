@@ -60,15 +60,28 @@ let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_
 /// - ``inSavepoint(_:)``
 /// - ``inTransaction(_:_:)``
 /// - ``isInsideTransaction``
+/// - ``readOnly(_:)``
 /// - ``rollback()``
+/// - ``transactionDate``
 /// - ``TransactionCompletion``
 /// - ``TransactionKind``
+///
+/// ### Printing Database Content
+///
+/// - ``dumpContent(format:to:)``
+/// - ``dumpRequest(_:format:to:)``
+/// - ``dumpSchema(to:)``
+/// - ``dumpSQL(_:format:to:)``
+/// - ``dumpTables(_:format:tableHeader:stableOrder:to:)``
+/// - ``DumpFormat``
+/// - ``DumpTableHeaderOptions``
 ///
 /// ### Database Observation
 ///
 /// - ``add(transactionObserver:extent:)``
 /// - ``remove(transactionObserver:)``
 /// - ``afterNextTransaction(onCommit:onRollback:)``
+/// - ``notifyChanges(in:)``
 /// - ``registerAccess(to:)``
 ///
 /// ### Collations
@@ -93,6 +106,7 @@ let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_
 ///
 /// ### Other Database Operations
 ///
+/// - ``add(tokenizer:)``
 /// - ``backup(to:pagesPerStep:progress:)``
 /// - ``checkpoint(_:on:)``
 /// - ``clearSchemaCache()``
@@ -101,6 +115,7 @@ let SQLITE_TRANSIENT = unsafeBitCast(OpaquePointer(bitPattern: -1), to: sqlite3_
 /// - ``trace(options:_:)``
 /// - ``CheckpointMode``
 /// - ``DatabaseBackupProgress``
+/// - ``StorageClass``
 /// - ``TraceEvent``
 /// - ``TracingOptions``
 public final class Database: CustomStringConvertible, CustomDebugStringConvertible {
@@ -276,6 +291,60 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     /// This cache is never cleared: we assume journal mode never changes.
     var journalModeCache: String?
     
+    // MARK: - Transaction Date
+    
+    enum AutocommitState {
+        case off
+        case on
+    }
+    
+    /// The state of the auto-commit mode, as left by the last
+    /// executed statement.
+    ///
+    /// The goal of this property is to detect changes in the auto-commit mode.
+    /// When you need to know if the database is currently in the auto-commit
+    /// mode, always prefer ``isInsideTransaction``.
+    var autocommitState = AutocommitState.on
+    
+    /// The date of the current transaction, wrapped in a result that is an
+    /// error if there was an error grabbing this date when the transaction has
+    /// started.
+    ///
+    /// Invariant: `transactionDateResult` is nil iff connection is not
+    /// inside a transaction.
+    var transactionDateResult: Result<Date, Error>?
+    
+    /// The date of the current transaction.
+    ///
+    /// The returned date is constant at any point during a transaction. It is
+    /// set when the database leaves the
+    /// [autocommit mode](https://www.sqlite.org/c3ref/get_autocommit.html) with
+    /// a `BEGIN` statement.
+    ///
+    /// When the database is not currently in a transaction, a new date is
+    /// returned on each call.
+    ///
+    /// See <doc:RecordTimestamps> for an example of usage.
+    ///
+    /// The transaction date, by default, is the start date of the current
+    /// transaction. You can override this default behavior by configuring
+    /// ``Configuration/transactionClock``.
+    public var transactionDate: Date {
+        get throws {
+            SchedulingWatchdog.preconditionValidQueue(self)
+            
+            // Check invariant: `transactionDateResult` is nil iff connection
+            // is not inside a transaction.
+            assert(isInsideTransaction || transactionDateResult == nil)
+            
+            if let transactionDateResult {
+                return try transactionDateResult.get()
+            } else {
+                return try configuration.transactionClock.now(self)
+            }
+        }
+    }
+    
     // MARK: - Private properties
     
     /// Support for ``Configuration/busyMode``.
@@ -335,10 +404,10 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
             _ = sqlite3_close(sqliteConnection) // ignore result code
             throw DatabaseError(resultCode: code)
         }
-        if let sqliteConnection = sqliteConnection {
-            return sqliteConnection
+        guard let sqliteConnection else {
+            throw DatabaseError(resultCode: .SQLITE_INTERNAL) // WTF SQLite?
         }
-        throw DatabaseError(resultCode: .SQLITE_INTERNAL) // WTF SQLite?
+        return sqliteConnection
     }
     
     // MARK: - Database Setup
@@ -363,6 +432,41 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         
         try validateFormat()
         configuration.SQLiteConnectionDidOpen?()
+    }
+    
+    /// Performs ``Configuration/JournalModeConfiguration/wal``.
+    func setUpWALMode() throws {
+        let journalMode = try String.fetchOne(self, sql: "PRAGMA journal_mode = WAL")
+        guard journalMode == "wal" else {
+            throw DatabaseError(message: "could not activate WAL Mode at path: \(path)")
+        }
+        
+        // https://www.sqlite.org/pragma.html#pragma_synchronous
+        // > Many applications choose NORMAL when in WAL mode
+        try execute(sql: "PRAGMA synchronous = NORMAL")
+        
+        // Make sure a non-empty wal file exists.
+        //
+        // The presence of the wal file avoids an SQLITE_CANTOPEN (14)
+        // error when the user opens a pool and reads from it.
+        // See <https://github.com/groue/GRDB.swift/issues/102>.
+        //
+        // The non-empty wal file avoids an SQLITE_ERROR (1) error
+        // when the user opens a pool and creates a wal snapshot
+        // (which happens when starting a ValueObservation).
+        // See <https://github.com/groue/GRDB.swift/issues/1383>.
+        let walPath = path + "-wal"
+        if try FileManager.default.fileExists(atPath: walPath) == false
+            || (URL(fileURLWithPath: walPath).resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) == 0
+        {
+            try inSavepoint {
+                try execute(sql: """
+                    CREATE TABLE grdb_issue_102 (id INTEGER PRIMARY KEY);
+                    DROP TABLE grdb_issue_102;
+                    """)
+                return .commit
+            }
+        }
     }
     
     private func setupDoubleQuotedStringLiterals() {
@@ -671,11 +775,38 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         }
     }
     
-    /// Grants read-only access in the wrapped closure.
-    func readOnly<T>(_ block: () throws -> T) throws -> T {
+    /// Executes read-only database operations, and returns their result
+    /// after they have finished executing.
+    ///
+    /// Attempts to write throw a ``DatabaseError`` with
+    /// resultCode `SQLITE_READONLY`.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// try dbQueue.write do { db in
+    ///     // Write OK
+    ///     try Player(...).insert(db)
+    ///
+    ///     try db.readOnly {
+    ///         // Read OK
+    ///         let players = try Player.fetchAll(db)
+    ///
+    ///         // Throws SQLITE_READONLY
+    ///         try Player(...).insert(db)
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// This method is reentrant.
+    ///
+    /// - parameter value: A closure that reads from the database.
+    /// - throws: A ``DatabaseError`` whenever an SQLite error occurs, or the
+    ///   error thrown by `value`.
+    public func readOnly<T>(_ value: () throws -> T) throws -> T {
         try beginReadOnly()
         return try throwingFirstError(
-            execute: block,
+            execute: value,
             finally: endReadOnly)
     }
     
@@ -689,6 +820,11 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     
     /// Reports the database region to ``ValueObservation``.
     ///
+    /// Calling this method does not fetch any database values. It just
+    /// helps optimizing `ValueObservation`. See
+    /// ``ValueObservation/trackingConstantRegion(_:)`` for more
+    /// information, and some examples of usage.
+    ///
     /// For example:
     ///
     /// ```swift
@@ -700,12 +836,9 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     /// }
     /// ```
     ///
-    /// See ``ValueObservation/trackingConstantRegion(_:)`` for some examples
-    /// of region reporting.
-    ///
-    /// This method has no effect on a ``ValueObservation`` created with an
-    /// explicit list of tracked regions. In the example below, only the
-    /// `player` table is tracked:
+    /// This method has no effect on a `ValueObservation` created with
+    /// ``ValueObservation/tracking(regions:fetch:)``. In the example below,
+    /// only the `player` table is tracked:
     ///
     /// ```swift
     /// // Observes the 'player' table only
@@ -717,6 +850,65 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     public func registerAccess(to region: @autoclosure () -> some DatabaseRegionConvertible) throws {
         if isRecordingSelectedRegion {
             try selectedRegion.formUnion(region().databaseRegion(self))
+        }
+    }
+    
+    /// Notifies that some changes were performed in the provided
+    /// database region.
+    ///
+    /// This method makes it possible to notify undetected changes, such as
+    /// changes performed by another process, changes performed by
+    /// direct calls to SQLite C functions, or changes to the
+    /// database schema.
+    /// See <doc:GRDB/TransactionObserver#Dealing-with-Undetected-Changes>
+    /// for a detailed list of undetected database modifications.
+    ///
+    /// It triggers active transaction observers (``TransactionObserver``).
+    /// In particular, ``ValueObservation`` that observe the input `region`
+    /// will fetch and notify a fresh value.
+    ///
+    /// For example:
+    ///
+    /// ```swift
+    /// try dbQueue.write { db in
+    ///     // Notify observers that some changes were performed in the database
+    ///     try db.notifyChanges(in: .fullDatabase)
+    ///
+    ///     // Notify observers that some changes were performed in the player table
+    ///     try db.notifyChanges(in: Player.all())
+    ///
+    ///     // Equivalent alternative
+    ///     try db.notifyChanges(in: Table("player"))
+    /// }
+    /// ```
+    ///
+    /// This method has no effect when called from a read-only
+    /// database access.
+    ///
+    /// > Caveat: Individual rowids in the input region are ignored.
+    /// > Notifying a change to a specific rowid is the same as notifying a
+    /// > change in the whole table:
+    /// >
+    /// > ```swift
+    /// > try dbQueue.write { db in
+    /// >     // Equivalent
+    /// >     try db.notifyChanges(in: Player.all())
+    /// >     try db.notifyChanges(in: Player.filter(id: 1))
+    /// > }
+    /// > ```
+    public func notifyChanges(in region: some DatabaseRegionConvertible) throws {
+        // Don't do anything when read-only, because read-only transactions
+        // are not notified. We don't want to notify transactions observers
+        // of changes, and have them wait for a commit notification that
+        // will never come.
+        if !isReadOnly, let observationBroker {
+            let eventKinds = try region
+                .databaseRegion(self)
+                // Use canonical table names for case insensitivity of the input.
+                .canonicalTables(self)
+                .impactfulEventKinds(self)
+            
+            try observationBroker.notifyChanges(withEventsOfKind: eventKinds)
         }
     }
     
@@ -804,31 +996,16 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         self.trace = trace
         
         if options.isEmpty || trace == nil {
-            #if os(Linux)
-            sqlite3_trace(sqliteConnection, nil)
-            #else
             sqlite3_trace_v2(sqliteConnection, 0, nil, nil)
-            #endif
             return
         }
         
-        // sqlite3_trace_v2 and sqlite3_expanded_sql were introduced in SQLite 3.14.0
-        // http://www.sqlite.org/changes.html#version_3_14
-        #if os(Linux)
-        let dbPointer = Unmanaged.passUnretained(self).toOpaque()
-        sqlite3_trace(sqliteConnection, { (dbPointer, sql) in
-            guard let sql = sql.map(String.init(cString:)) else { return }
-            let db = Unmanaged<Database>.fromOpaque(dbPointer!).takeUnretainedValue()
-            db.trace?(Database.TraceEvent.statement(TraceEvent.Statement(impl: .trace_v1(sql))))
-        }, dbPointer)
-        #else
         let dbPointer = Unmanaged.passUnretained(self).toOpaque()
         sqlite3_trace_v2(sqliteConnection, CUnsignedInt(bitPattern: options.rawValue), { (mask, dbPointer, p, x) in
             let db = Unmanaged<Database>.fromOpaque(dbPointer!).takeUnretainedValue()
             db.trace_v2(CInt(bitPattern: mask), p, x, sqlite3_expanded_sql)
             return SQLITE_OK
         }, dbPointer)
-        #endif
     }
     
     // Precondition: configuration.trace != nil
@@ -836,7 +1013,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         _ mask: CInt,
         _ p: UnsafeMutableRawPointer?,
         _ x: UnsafeMutableRawPointer?,
-        _ sqlite3_expanded_sql: @escaping @convention(c) (OpaquePointer?) -> UnsafeMutablePointer<Int8>?)
+        _ sqlite3_expanded_sql: @escaping @convention(c) (OpaquePointer?) -> UnsafeMutablePointer<CChar>?)
     {
         guard let trace else { return }
         
@@ -844,26 +1021,22 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
         case SQLITE_TRACE_STMT:
             if let sqliteStatement = p, let unexpandedSQL = x {
                 let statement = TraceEvent.Statement(
-                    impl: .trace_v2(
-                        sqliteStatement: OpaquePointer(sqliteStatement),
-                        unexpandedSQL: UnsafePointer(unexpandedSQL.assumingMemoryBound(to: CChar.self)),
-                        sqlite3_expanded_sql: sqlite3_expanded_sql,
-                        publicStatementArguments: configuration.publicStatementArguments))
+                    sqliteStatement: OpaquePointer(sqliteStatement),
+                    unexpandedSQL: UnsafePointer(unexpandedSQL.assumingMemoryBound(to: CChar.self)),
+                    sqlite3_expanded_sql: sqlite3_expanded_sql,
+                    publicStatementArguments: configuration.publicStatementArguments)
                 trace(TraceEvent.statement(statement))
             }
         case SQLITE_TRACE_PROFILE:
             if let sqliteStatement = p, let durationP = x?.assumingMemoryBound(to: Int64.self) {
                 let statement = TraceEvent.Statement(
-                    impl: .trace_v2(
-                        sqliteStatement: OpaquePointer(sqliteStatement),
-                        unexpandedSQL: nil,
-                        sqlite3_expanded_sql: sqlite3_expanded_sql,
-                        publicStatementArguments: configuration.publicStatementArguments))
+                    sqliteStatement: OpaquePointer(sqliteStatement),
+                    unexpandedSQL: nil,
+                    sqlite3_expanded_sql: sqlite3_expanded_sql,
+                    publicStatementArguments: configuration.publicStatementArguments)
                 let duration = TimeInterval(durationP.pointee) / 1.0e9
                 
-                #if !os(Linux)
                 trace(TraceEvent.profile(statement: statement, duration: duration))
-                #endif
             }
         default:
             break
@@ -1084,7 +1257,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     /// For example:
     ///
     /// ```swift
-    /// try dbQueue.writeWithoutTransaction do {
+    /// try dbQueue.writeWithoutTransaction do { db in
     ///     try db.inTransaction {
     ///         try db.execute(sql: "INSERT ...")
     ///         return .commit
@@ -1163,7 +1336,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
             }
         }
         
-        if let firstError = firstError {
+        if let firstError {
             throw firstError
         }
     }
@@ -1312,7 +1485,7 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
             }
         }
         
-        if let firstError = firstError {
+        if let firstError {
             throw firstError
         }
     }
@@ -1560,6 +1733,11 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     }
 }
 
+// Explicit non-conformance to Sendable: `Database` must be used from a
+// serialized database access dispatch queue (see `SerializedDatabase`).
+@available(*, unavailable)
+extension Database: Sendable { }
+
 #if SQLITE_HAS_CODEC
 extension Database {
     
@@ -1685,7 +1863,7 @@ extension Database {
     /// The available checkpoint modes.
     ///
     /// Related SQLite documentation: <https://www.sqlite.org/c3ref/wal_checkpoint_v2.html>
-    public enum CheckpointMode: CInt {
+    public enum CheckpointMode: CInt, Sendable {
         /// The `SQLITE_CHECKPOINT_PASSIVE` mode.
         case passive = 0
         
@@ -1704,7 +1882,7 @@ extension Database {
     /// Related SQLite documentation:
     /// - <https://www.sqlite.org/datatype3.html#collating_sequences>
     /// - <https://www.sqlite.org/datatype3.html#collation>
-    public struct CollationName: RawRepresentable, Hashable {
+    public struct CollationName: RawRepresentable, Hashable, Sendable {
         public let rawValue: String
         
         /// Creates a collation name.
@@ -1741,10 +1919,11 @@ extension Database {
     ///
     /// For more information, see
     /// [Datatypes In SQLite](https://www.sqlite.org/datatype3.html).
-    public struct ColumnType: RawRepresentable, Hashable {
+    public struct ColumnType: RawRepresentable, Hashable, Sendable {
         /// The SQL for the column type (`"TEXT"`, `"BLOB"`, etc.)
         public let rawValue: String
         
+        // TODO: GRDB7 make it an failable initializer that returns nil when rawValue is empty (or blank).
         /// Creates an SQL column type.
         public init(rawValue: String) {
             self.rawValue = rawValue
@@ -1752,6 +1931,14 @@ extension Database {
         
         /// The `TEXT` column type.
         public static let text = ColumnType(rawValue: "TEXT")
+        
+        /// The `TEXT` column type, suitable for JSON columns.
+        ///
+        /// SQLite JSON functions and operators are
+        /// [documented](https://www.sqlite.org/json1.html#interface_overview)
+        /// to throw errors if any of their arguments are binary blobs.
+        /// That's the reason why it is recommended to store JSON as text.
+        public static let jsonText = ColumnType(rawValue: "TEXT")
         
         /// The `INTEGER` column type.
         public static let integer = ColumnType(rawValue: "INTEGER")
@@ -1784,7 +1971,7 @@ extension Database {
     /// An SQLite conflict resolution.
     ///
     /// Related SQLite documentation: <https://www.sqlite.org/lang_conflict.html>
-    public enum ConflictResolution: String {
+    public enum ConflictResolution: String, Sendable {
         /// The `ROLLBACK` conflict resolution.
         case rollback = "ROLLBACK"
         
@@ -1804,7 +1991,7 @@ extension Database {
     /// A foreign key action.
     ///
     /// Related SQLite documentation: <https://www.sqlite.org/foreignkeys.html>
-    public enum ForeignKeyAction: String {
+    public enum ForeignKeyAction: String, Sendable {
         /// The `CASCADE` foreign key action.
         case cascade = "CASCADE"
         
@@ -1821,13 +2008,39 @@ extension Database {
     /// An error log function that takes an error code and message.
     public typealias LogErrorFunction = (_ resultCode: ResultCode, _ message: String) -> Void
     
+    /// An SQLite storage class.
+    ///
+    /// For more information, see
+    /// [Datatypes In SQLite](https://www.sqlite.org/datatype3.html).
+    public struct StorageClass: RawRepresentable, Hashable, Sendable {
+        /// The SQL for the storage class (`"INTEGER"`, `"REAL"`, etc.)
+        public let rawValue: String
+        
+        /// Creates an SQL storage class.
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+        
+        /// The `INTEGER` storage class.
+        public static let integer = StorageClass(rawValue: "INTEGER")
+        
+        /// The `REAL` storage class.
+        public static let real = StorageClass(rawValue: "REAL")
+        
+        /// The `TEXT` storage class.
+        public static let text = StorageClass(rawValue: "TEXT")
+        
+        /// The `BLOB` storage class.
+        public static let blob = StorageClass(rawValue: "BLOB")
+    }
+    
     /// An option for the SQLite tracing feature.
     ///
     /// You use `TracingOptions` with the `Database`
     /// ``Database/trace(options:_:)`` method.
     ///
     /// Related SQLite documentation: <https://www.sqlite.org/c3ref/c_trace.html>
-    public struct TracingOptions: OptionSet {
+    public struct TracingOptions: OptionSet, Sendable {
         /// The raw trace event code.
         public let rawValue: CInt
         
@@ -1841,13 +2054,11 @@ extension Database {
         /// Trace event code: `SQLITE_TRACE_STMT`.
         public static let statement = TracingOptions(rawValue: SQLITE_TRACE_STMT)
         
-        #if !os(Linux)
         /// The option that reports executed statements and the estimated
         /// duration that the statement took to run.
         ///
         /// Trace event code: `SQLITE_TRACE_PROFILE`.
         public static let profile = TracingOptions(rawValue: SQLITE_TRACE_PROFILE)
-        #endif
     }
     
     /// A trace event.
@@ -1858,17 +2069,11 @@ extension Database {
         
         /// Information about an executed statement.
         public struct Statement: CustomStringConvertible {
-            enum Impl {
-                case trace_v1(String)
-                case trace_v2(
-                        sqliteStatement: SQLiteStatement,
-                        unexpandedSQL: UnsafePointer<CChar>?,
-                        sqlite3_expanded_sql: @convention(c) (OpaquePointer?) -> UnsafeMutablePointer<Int8>?,
-                        publicStatementArguments: Bool) // See Configuration.publicStatementArguments
-            }
-            var impl: Impl
+            var sqliteStatement: SQLiteStatement
+            var unexpandedSQL: UnsafePointer<CChar>?
+            var sqlite3_expanded_sql: @convention(c) (OpaquePointer?) -> UnsafeMutablePointer<CChar>?
+            var publicStatementArguments: Bool // See Configuration.publicStatementArguments
             
-            #if !os(Linux)
             /// The executed SQL, where bound parameters are not expanded.
             ///
             /// For example:
@@ -1876,21 +2081,11 @@ extension Database {
             /// ```sql
             /// SELECT * FROM player WHERE email = ?
             /// ```
-            public var sql: String { _sql }
-            #endif
-            
-            var _sql: String {
-                switch impl {
-                case .trace_v1:
-                    // Likely a GRDB bug: this api is not supposed to be available
-                    fatalError("Unavailable statement SQL")
-                    
-                case let .trace_v2(sqliteStatement, unexpandedSQL, _, _):
-                    if let unexpandedSQL = unexpandedSQL {
-                        return String(cString: unexpandedSQL).trimmedSQLStatement
-                    } else {
-                        return String(cString: sqlite3_sql(sqliteStatement)).trimmedSQLStatement
-                    }
+            public var sql: String {
+                if let unexpandedSQL {
+                    return String(cString: unexpandedSQL).trimmedSQLStatement
+                } else {
+                    return String(cString: sqlite3_sql(sqliteStatement)).trimmedSQLStatement
                 }
             }
             
@@ -1906,30 +2101,18 @@ extension Database {
             ///   information from leaking in unexpected locations, so use this
             ///   property with care.
             public var expandedSQL: String {
-                switch impl {
-                case let .trace_v1(expandedSQL):
-                    return expandedSQL
-                    
-                case let .trace_v2(sqliteStatement, _, sqlite3_expanded_sql, _):
-                    guard let cString = sqlite3_expanded_sql(sqliteStatement) else {
-                        return ""
-                    }
-                    defer { sqlite3_free(cString) }
-                    return String(cString: cString).trimmedSQLStatement
+                guard let cString = sqlite3_expanded_sql(sqliteStatement) else {
+                    return ""
                 }
+                defer { sqlite3_free(cString) }
+                return String(cString: cString).trimmedSQLStatement
             }
             
             public var description: String {
-                switch impl {
-                case let .trace_v1(expandedSQL):
+                if publicStatementArguments {
                     return expandedSQL
-                    
-                case let .trace_v2(_, _, _, publicStatementArguments):
-                    if publicStatementArguments {
-                        return expandedSQL
-                    } else {
-                        return _sql
-                    }
+                } else {
+                    return sql
                 }
             }
         }
@@ -1990,7 +2173,7 @@ extension Database {
     ///
     /// Related SQLite documentation: <https://www.sqlite.org/lang_transaction.html>.
     @frozen
-    public enum TransactionCompletion {
+    public enum TransactionCompletion: Sendable {
         case commit
         case rollback
     }
@@ -1998,7 +2181,7 @@ extension Database {
     /// A transaction kind.
     ///
     /// Related SQLite documentation: <https://www.sqlite.org/lang_transaction.html>.
-    public enum TransactionKind: String {
+    public enum TransactionKind: String, Sendable {
         /// The `DEFERRED` transaction kind.
         case deferred = "DEFERRED"
         
@@ -2031,3 +2214,13 @@ extension Database {
         }
     }
 }
+
+// Explicit non-conformance to Sendable: a trace event contains transient
+// information.
+@available(*, unavailable)
+extension Database.TraceEvent: Sendable { }
+
+// Explicit non-conformance to Sendable: a trace event contains transient
+// information.
+@available(*, unavailable)
+extension Database.TraceEvent.Statement: Sendable { }

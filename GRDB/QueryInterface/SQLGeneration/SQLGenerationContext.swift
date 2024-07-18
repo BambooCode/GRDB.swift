@@ -172,15 +172,21 @@ class StatementArgumentsSink {
     private(set) var arguments: StatementArguments
     private let rawSQL: Bool
     
-    /// A sink which does not accept any arguments.
-    static let forRawSQL = StatementArgumentsSink(rawSQL: true)
+    /// A sink which turns all argument values into SQL literals.
+    ///
+    /// The `"WHERE name = \("O'Brien")"` SQL literal is turned into the
+    /// `WHERE name = 'O''Brien'` SQL.
+    static let literalValues = StatementArgumentsSink(rawSQL: true)
     
     private init(rawSQL: Bool) {
         self.arguments = []
         self.rawSQL = rawSQL
     }
     
-    /// A sink which accepts arguments
+    /// A sink which turns all argument values into `?` SQL parameters.
+    ///
+    /// The `"WHERE name = \("O'Brien")"` SQL literal is turned into the
+    /// `WHERE name = ?` SQL.
     convenience init() {
         self.init(rawSQL: false)
     }
@@ -324,7 +330,7 @@ public class TableAlias {
         
         switch impl {
         case let .undefined(userName):
-            if let userName = userName {
+            if let userName {
                 // rename
                 assert(base.userName == nil || base.userName == userName)
                 base.setUserName(userName)
@@ -332,7 +338,7 @@ public class TableAlias {
             self.impl = .proxy(base)
         case let .table(tableName: tableName, userName: userName):
             assert(tableName == base.tableName)
-            if let userName = userName {
+            if let userName {
                 // rename
                 assert(base.userName == nil || base.userName == userName)
                 base.setUserName(userName)
@@ -358,7 +364,7 @@ public class TableAlias {
                 // can't merge
                 return nil
             }
-            if let userName = userName, let otherUserName = otherUserName, userName != otherUserName {
+            if let userName, let otherUserName, userName != otherUserName {
                 // can't merge
                 return nil
             }
@@ -423,6 +429,15 @@ public class TableAlias {
     /// ```
     public subscript(_ expression: some SQLSpecificExpressible & SQLSelectable & SQLOrderingTerm) -> SQLExpression {
         expression.sqlExpression.qualified(with: self)
+    }
+    
+    public subscript(_ expression: some SQLJSONExpressible &
+                     SQLSpecificExpressible &
+                     SQLSelectable &
+                     SQLOrderingTerm)
+    -> AnySQLJSONExpressible
+    {
+        AnySQLJSONExpressible(sqlExpression: expression.sqlExpression.qualified(with: self))
     }
     
     /// Returns an SQL ordering term that refers to the aliased table.

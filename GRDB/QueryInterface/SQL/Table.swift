@@ -138,7 +138,7 @@
 /// ### Database Observation Support
 ///
 /// - ``databaseRegion(_:)``
-public struct Table<RowDecoder> {
+public struct Table<RowDecoder>: Sendable {
     /// The table name.
     public var tableName: String
     
@@ -298,10 +298,10 @@ extension Table {
     ///     let maxScore: Int = row[1]
     /// }
     /// ```
-    public func select<RowDecoder>(
+    public func select<T>(
         _ selection: [any SQLSelectable],
-        as type: RowDecoder.Type = RowDecoder.self)
-    -> QueryInterfaceRequest<RowDecoder>
+        as type: T.Type = T.self)
+    -> QueryInterfaceRequest<T>
     {
         all().select(selection, as: type)
     }
@@ -328,10 +328,10 @@ extension Table {
     ///     let maxScore: Int = row[1]
     /// }
     /// ```
-    public func select<RowDecoder>(
+    public func select<T>(
         _ selection: any SQLSelectable...,
-        as type: RowDecoder.Type = RowDecoder.self)
-    -> QueryInterfaceRequest<RowDecoder>
+        as type: T.Type = T.self)
+    -> QueryInterfaceRequest<T>
     {
         all().select(selection, as: type)
     }
@@ -353,11 +353,11 @@ extension Table {
     /// let request = playerTable.select(sql: "IFNULL(name, ?)", arguments: [defaultName], as: String.self)
     /// let names = try request.fetchAll(db) // [String]
     /// ```
-    public func select<RowDecoder>(
+    public func select<T>(
         sql: String,
         arguments: StatementArguments = StatementArguments(),
-        as type: RowDecoder.Type = RowDecoder.self)
-    -> QueryInterfaceRequest<RowDecoder>
+        as type: T.Type = T.self)
+    -> QueryInterfaceRequest<T>
     {
         all().select(SQL(sql: sql, arguments: arguments), as: type)
     }
@@ -376,10 +376,10 @@ extension Table {
     /// let request = playerTable.select(literal: "IFNULL(name, \(defaultName))", as: String.self)
     /// let names = try request.fetchAll(db) // [String]
     /// ```
-    public func select<RowDecoder>(
+    public func select<T>(
         literal sqlLiteral: SQL,
-        as type: RowDecoder.Type = RowDecoder.self)
-    -> QueryInterfaceRequest<RowDecoder>
+        as type: T.Type = T.self)
+    -> QueryInterfaceRequest<T>
     {
         all().select(sqlLiteral, as: type)
     }
@@ -723,7 +723,7 @@ extension Table {
     }
 }
 
-@available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension Table where RowDecoder: Identifiable, RowDecoder.ID: DatabaseValueConvertible {
     /// Returns a request filtered by primary key.
     ///
@@ -1346,7 +1346,7 @@ extension Table {
     {
         let association = HasManyThroughAssociation(through: pivot, using: target)
 
-        if let key = key {
+        if let key {
             return association.forKey(key)
         } else {
             return association
@@ -1378,7 +1378,7 @@ extension Table {
     {
         let association = HasOneThroughAssociation(through: pivot, using: target)
 
-        if let key = key {
+        if let key {
             return association.forKey(key)
         } else {
             return association
@@ -1546,7 +1546,7 @@ extension Table {
     }
 }
 
-@available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension Table
 where RowDecoder: Identifiable,
       RowDecoder.ID: DatabaseValueConvertible
@@ -1688,7 +1688,7 @@ extension Table {
     }
 }
 
-@available(OSX 10.15, iOS 13.0, tvOS 13.0, watchOS 6, *)
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
 extension Table
 where RowDecoder: Identifiable,
       RowDecoder.ID: DatabaseValueConvertible

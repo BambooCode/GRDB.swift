@@ -112,13 +112,15 @@ let components: [SQL] = [
 let query = components.joined(separator: " ")
 ```
 
-Extract the plain SQL string from a literal:
+To extract the plain SQL string from a literal, you need a `Database` connection such as the one provided by the `read` and `write` methods:
 
 ```swift
-let query: SQL = "UPDATE player SET name = \(name) WHERE id = \(id)"
-let (sql, arguments) = try dbQueue.read(query.build)
-print(sql)       // prints "UPDATE player SET name = ? WHERE id = ?"
-print(arguments) // prints ["O'Brien", 42]
+try dbQueue.read { db in
+    let query: SQL = "UPDATE player SET name = \(name) WHERE id = \(id)"
+    let (sql, arguments) = try query.build(db)
+    print(sql)       // prints "UPDATE player SET name = ? WHERE id = ?"
+    print(arguments) // prints ["O'Brien", 42]
+}
 ```
 
 Build a literal from a plain SQL string:
@@ -363,7 +365,7 @@ Let's extend Player with database methods.
 
 This chapter lists all kinds of supported interpolations.
 
-- Types adopting the [TableRecord] protocol:
+- Types adopting the [TableRecord] protocol and [Table](https://swiftpackageindex.com/groue/grdb.swift/documentation/grdb/table) instances:
 
     ```swift
     struct Player: TableRecord { ... }
@@ -371,9 +373,13 @@ This chapter lists all kinds of supported interpolations.
     // SELECT * FROM player
     "SELECT * FROM \(Player.self)"
     
-    // INSERT INTO player ...
+    // SELECT * FROM player
     let player: Player = ...
-    "INSERT INTO \(tableOf: player) ..."
+    "SELECT * FROM \(tableOf: player) ..."
+
+    // SELECT * FROM player
+    let playerTable = Table("player")
+    "SELECT * FROM \(playerTable)"
     ```
 
 - Columns selected by [TableRecord]:

@@ -203,7 +203,7 @@ open class Record {
             // Loop until we find a change, or exhaust columns:
             while let (column, newValue) = newValueIterator.next() {
                 let newDbValue = newValue?.databaseValue ?? .null
-                guard let oldRow = oldRow, let oldDbValue: DatabaseValue = oldRow[column] else {
+                guard let oldRow, let oldDbValue: DatabaseValue = oldRow[column] else {
                     return (column, nil)
                 }
                 if newDbValue != oldDbValue {
@@ -411,7 +411,7 @@ open class Record {
     /// On success, this method sets the `hasDatabaseChanges` flag to false.
     ///
     /// - parameter db: A database connection.
-    /// - returns: Whether the record had changes.
+    /// - returns: Whether the record had changes and was updated.
     /// - throws: A ``DatabaseError`` whenever an SQLite error occurs.
     ///   ``RecordError/recordNotFound(databaseTableName:key:)`` is thrown
     ///   if the primary key does not match any row in the database and record
