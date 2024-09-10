@@ -124,8 +124,6 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     
     // MARK: - SQLite C API
     
-    // TODO: make it non optional, since one can't get a `Database` instance
-    // after `close()`.
     /// The raw SQLite connection, suitable for the SQLite C API.
     ///
     /// The result is nil after the database has been successfully closed with
@@ -1577,7 +1575,9 @@ public final class Database: CustomStringConvertible, CustomDebugStringConvertib
     /// Frees as much memory as possible.
     public func releaseMemory() {
         SchedulingWatchdog.preconditionValidQueue(self)
-        sqlite3_db_release_memory(sqliteConnection)
+        if let sqliteConnection {
+            sqlite3_db_release_memory(sqliteConnection)
+        }
         schemaCache.clear()
         internalStatementCache.clear()
         publicStatementCache.clear()
@@ -1923,7 +1923,6 @@ extension Database {
         /// The SQL for the column type (`"TEXT"`, `"BLOB"`, etc.)
         public let rawValue: String
         
-        // TODO: GRDB7 make it an failable initializer that returns nil when rawValue is empty (or blank).
         /// Creates an SQL column type.
         public init(rawValue: String) {
             self.rawValue = rawValue
@@ -2083,7 +2082,8 @@ extension Database {
             /// ```
             public var sql: String {
                 if let unexpandedSQL {
-                    return String(cString: unexpandedSQL).trimmedSQLStatement
+                    let sql = String(cString: unexpandedSQL)
+                    return sql.hasPrefix("--") ? sql : sql.trimmedSQLStatement
                 } else {
                     return String(cString: sqlite3_sql(sqliteStatement)).trimmedSQLStatement
                 }
@@ -2101,6 +2101,10 @@ extension Database {
             ///   information from leaking in unexpected locations, so use this
             ///   property with care.
             public var expandedSQL: String {
+                if let unexpandedSQL {
+                    let sql = String(cString: unexpandedSQL)
+                    if sql.hasPrefix("--") { return sql }
+                }
                 guard let cString = sqlite3_expanded_sql(sqliteStatement) else {
                     return ""
                 }
