@@ -26,6 +26,30 @@ if ProcessInfo.processInfo.environment["SQLITE_ENABLE_PREUPDATE_HOOK"] == "1" {
     cSettings.append(.define("GRDB_SQLITE_ENABLE_PREUPDATE_HOOK"))
 }
 
+let sqlCipherCSettings = [
+    .define("SQLITE_HAS_CODEC"),
+    .define("SQLITE_TEMP_STORE", to: "2"),
+    .define("SQLITE_SOUNDEX"),
+    .define("SQLITE_THREADSAFE"),
+    .define("SQLITE_ENABLE_RTREE"),
+    .define("SQLITE_ENABLE_STAT3"),
+    .define("SQLITE_ENABLE_STAT4"),
+    .define("SQLITE_ENABLE_COLUMN_METADATA"),
+    .define("SQLITE_ENABLE_MEMORY_MANAGEMENT"),
+    .define("SQLITE_ENABLE_LOAD_EXTENSION"),
+    .define("SQLITE_ENABLE_FTS4"),
+    .define("SQLITE_ENABLE_FTS4_UNICODE61"),
+    .define("SQLITE_ENABLE_FTS3_PARENTHESIS"),
+    .define("SQLITE_ENABLE_UNLOCK_NOTIFY"),
+    .define("SQLITE_ENABLE_JSON1"),
+    .define("SQLITE_ENABLE_FTS5"),
+    .define("SQLCIPHER_CRYPTO_CC"),
+    .define("HAVE_USLEEP", to: "1"),
+    .define("SQLITE_MAX_VARIABLE_NUMBER", to: "99999")
+    .define("NDEBUG"),
+    .define("HAVE_GETHOSTUUID", to: "0")
+]
+
 // The SPI_BUILDER environment variable enables documentation building
 // on <https://swiftpackageindex.com/groue/GRDB.swift>. See
 // <https://github.com/SwiftPackageIndex/SwiftPackageIndex-Server/issues/2122>
@@ -48,6 +72,7 @@ let package = Package(
     products: [
         .library(name: "GRDBSQLite", targets: ["GRDBSQLite"]),
         .library(name: "GRDB", targets: ["GRDB"]),
+        .library(name: "SQLCipher", targets: ["SQLCipher"]),
         .library(name: "GRDB-dynamic", type: .dynamic, targets: ["GRDB"]),
     ],
     dependencies: dependencies,
@@ -64,6 +89,9 @@ let package = Package(
             resources: [.copy("PrivacyInfo.xcprivacy")],
             cSettings: cSettings,
             swiftSettings: swiftSettings),
+        .target(
+            name: "SQLCipher",
+            cSettings: sqlCipherCSettings),
         .testTarget(
             name: "GRDBTests",
             dependencies: ["GRDB"],
