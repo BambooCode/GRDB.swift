@@ -1,25 +1,98 @@
-// swift-tools-version: 5.7
+// swift-tools-version:6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
+
+let darwinPlatforms: [Platform] = [
+    .iOS,
+    .macOS,
+    .macCatalyst,
+    .tvOS,
+    .visionOS,
+    .watchOS,
+]
+var swiftSettings: [SwiftSetting] = [
+    .define("SQLITE_ENABLE_FTS5"),
+    .define("SQLITE_ENABLE_SNAPSHOT"),
+]
+var cSettings: [CSetting] = []
+var dependencies: [PackageDescription.Package.Dependency] = []
+
+// Don't rely on those environment variables. They are ONLY testing conveniences:
+// $ SQLITE_ENABLE_PREUPDATE_HOOK=1 make test_SPM
+if ProcessInfo.processInfo.environment["SQLITE_ENABLE_PREUPDATE_HOOK"] == "1" {
+    swiftSettings.append(.define("SQLITE_ENABLE_PREUPDATE_HOOK"))
+    cSettings.append(.define("GRDB_SQLITE_ENABLE_PREUPDATE_HOOK"))
+}
+
+// The SPI_BUILDER environment variable enables documentation building
+// on <https://swiftpackageindex.com/groue/GRDB.swift>. See
+// <https://github.com/SwiftPackageIndex/SwiftPackageIndex-Server/issues/2122>
+// for more information.
+//
+// SPI_BUILDER also enables the `make docs-localhost` command.
+if ProcessInfo.processInfo.environment["SPI_BUILDER"] == "1" {
+    dependencies.append(.package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"))
+}
 
 let package = Package(
     name: "GRDB",
+    defaultLocalization: "en", // for tests
     platforms: [
-        .iOS(.v11),
+        .iOS(.v13),
         .macOS(.v10_15),
+        .tvOS(.v13),
+        .watchOS(.v7),
     ],
     products: [
-        .library(name: "GRDB", targets: ["GRDB", "_GRDBDummy"]),
-        .library(name: "SQLCipher", targets: ["SQLCipher"])
+        .library(name: "GRDBSQLite", targets: ["GRDBSQLite"]),
+        .library(name: "GRDB", targets: ["GRDB"]),
+        .library(name: "GRDB-dynamic", type: .dynamic, targets: ["GRDB"]),
     ],
+    dependencies: dependencies,
     targets: [
-        .binaryTarget(
+        .systemLibrary(
+            name: "GRDBSQLite",
+            providers: [.apt(["libsqlite3-dev"])]),
+        .target(
             name: "GRDB",
-            url: "https://github.com/DuckDuckGo/GRDB.swift/releases/download/3.0.0/GRDB.xcframework.zip",
-            checksum: "41f01022f6a35986393e063e1ef386fd896646ed032f7d0419c4b02fa3afe61d"
-        ),
-        .target(name: "_GRDBDummy"),
-        .target(name: "SQLCipher")
-    ]
+            dependencies: [
+                .target(name: "GRDBSQLite"),
+            ],
+            path: "GRDB",
+            resources: [.copy("PrivacyInfo.xcprivacy")],
+            cSettings: cSettings,
+            swiftSettings: swiftSettings),
+        .testTarget(
+            name: "GRDBTests",
+            dependencies: ["GRDB"],
+            path: "Tests",
+            exclude: [
+                "CocoaPods",
+                "Crash",
+                "CustomSQLite",
+                "GRDBManualInstall",
+                "GRDBTests/getThreadsCount.c",
+                "Info.plist",
+                "Performance",
+                "SPM",
+                "Swift6Migration",
+                "generatePerformanceReport.rb",
+                "parsePerformanceTests.rb",
+            ],
+            resources: [
+                .copy("GRDBTests/Betty.jpeg"),
+                .copy("GRDBTests/InflectionsTests.json"),
+                .copy("GRDBTests/Issue1383.sqlite"),
+            ],
+            cSettings: cSettings,
+            swiftSettings: swiftSettings + [
+                // Tests still use the Swift 5 language mode.
+                .swiftLanguageMode(.v5),
+                .enableUpcomingFeature("InferSendableFromCaptures"),
+                .enableUpcomingFeature("GlobalActorIsolatedTypesUsability"),
+            ])
+    ],
+    swiftLanguageModes: [.v6]
 )
