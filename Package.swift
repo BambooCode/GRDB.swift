@@ -10,14 +10,14 @@ let package = Package(
         .macOS(.v10_15),
     ],
     products: [
-        .library(name: "GRDB", targets: ["GRDB", "_GRDBDummy"]),
+        .library(name: "GRDB", targets: ["GRDB"]),
         .library(name: "SQLCipher", targets: ["SQLCipher"]),
     ],
     targets: [
         .binaryTarget(
             name: "GRDB",
-            url: "https://github.com/BambooCode/GRDB.swift/releases/download/0.3.4-sqlcipher/GRDB.xcframework.zip",
-            checksum: "e2d1d67a5ecbd32ac5cbbfc8b8b43405dd385527d582bbdeae1b1bfc264bad19"
+            url: "https://github.com/bamboocode/GRDB.swift/releases/download/0.3.5-sqlcipher/GRDB.xcframework.zip",
+            checksum: "78efcc298cd8befff595652062953b88ddf1365ff174a81fa121d507bd8380ae"
         ),
         .target(
             name: "SQLCipher",
@@ -49,7 +49,6 @@ let package = Package(
                 .define("SQLITE_EXTRA_INIT", to: "sqlcipher_extra_init"),
                 .define("SQLITE_EXTRA_SHUTDOWN", to: "sqlcipher_extra_shutdown"),
             ]
-        ),
-        .target(name: "_GRDBDummy")
+        )
     ]
 )
