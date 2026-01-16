@@ -26,7 +26,7 @@ if ProcessInfo.processInfo.environment["SQLITE_ENABLE_PREUPDATE_HOOK"] == "1" {
     cSettings.append(.define("GRDB_SQLITE_ENABLE_PREUPDATE_HOOK"))
 }
 
-let sqlCipherCSettings = [
+let sqlCipherCSettings: [CSetting] = [
     .define("SQLITE_HAS_CODEC"),
     .define("SQLITE_TEMP_STORE", to: "2"),
     .define("SQLITE_SOUNDEX"),
