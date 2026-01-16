@@ -16,10 +16,10 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "GRDB",
-            url: "https://github.com/BambooCode/GRDB.swift/releases/download/0.3.3-sqlcipher/GRDB.xcframework.zip",
-            checksum: "5a7156c3eda1226d56cdd011dfedb99e751d475c55def1dd383875c22453de3f"
+            url: "https://github.com/DuckDuckGo/GRDB.swift/releases/download/0.3.4-sqlcipher/GRDB.xcframework.zip",
+            checksum: "e2d1d67a5ecbd32ac5cbbfc8b8b43405dd385527d582bbdeae1b1bfc264bad19"
         ),
-       .target(
+        .target(
             name: "SQLCipher",
             path: "Sources/SQLCipher",
             publicHeadersPath: "include",
