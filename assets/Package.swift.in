@@ -10,7 +10,7 @@ let package = Package(
         .macOS(.v10_15),
     ],
     products: [
-        .library(name: "GRDB", targets: ["GRDB", "_GRDBDummy"]),
+        .library(name: "GRDB", targets: ["GRDB"]),
         .library(name: "SQLCipher", targets: ["SQLCipher"]),
     ],
     targets: [
@@ -49,7 +49,6 @@ let package = Package(
                 .define("SQLITE_EXTRA_INIT", to: "sqlcipher_extra_init"),
                 .define("SQLITE_EXTRA_SHUTDOWN", to: "sqlcipher_extra_shutdown"),
             ]
-        ),
-        .target(name: "_GRDBDummy")
+        )
     ]
 )
