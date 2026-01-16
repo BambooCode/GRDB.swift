@@ -45,7 +45,7 @@ let sqlCipherCSettings: [CSetting] = [
     .define("SQLITE_ENABLE_FTS5"),
     .define("SQLCIPHER_CRYPTO_CC"),
     .define("HAVE_USLEEP", to: "1"),
-    .define("SQLITE_MAX_VARIABLE_NUMBER", to: "99999")
+    .define("SQLITE_MAX_VARIABLE_NUMBER", to: "99999"),
     .define("NDEBUG"),
     .define("HAVE_GETHOSTUUID", to: "0")
 ]
