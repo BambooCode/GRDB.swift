@@ -11,12 +11,44 @@ let package = Package(
     ],
     products: [
         .library(name: "GRDB", targets: ["GRDB", "_GRDBDummy"]),
+        .library(name: "SQLCipher", targets: ["SQLCipher"]),
     ],
     targets: [
         .binaryTarget(
             name: "GRDB",
             url: "https://github.com/DuckDuckGo/GRDB.swift/releases/download/${new_version}/GRDB.xcframework.zip",
             checksum: "${checksum}"
+        ),
+        .target(
+            name: "SQLCipher",
+            path: "Sources/SQLCipher",
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("SQLITE_HAS_CODEC"),
+                .define("GRDBCIPHER"),
+                .define("SQLITE_ENABLE_FTS5"),
+                .define("SQLITE_TEMP_STORE", to: "2"),
+                .define("SQLITE_SOUNDEX"),
+                .define("SQLITE_THREADSAFE"),
+                .define("SQLITE_ENABLE_RTREE"),
+                .define("SQLITE_ENABLE_STAT3"),
+                .define("SQLITE_ENABLE_STAT4"),
+                .define("SQLITE_ENABLE_COLUMN_METADATA"),
+                .define("SQLITE_ENABLE_MEMORY_MANAGEMENT"),
+                .define("SQLITE_ENABLE_LOAD_EXTENSION"),
+                .define("SQLITE_ENABLE_FTS4"),
+                .define("SQLITE_ENABLE_FTS4_UNICODE61"),
+                .define("SQLITE_ENABLE_FTS3_PARENTHESIS"),
+                .define("SQLITE_ENABLE_UNLOCK_NOTIFY"),
+                .define("SQLITE_ENABLE_JSON1"),
+                .define("SQLITE_ENABLE_FTS5"),
+                .define("SQLITE_ENABLE_SNAPSHOT"),
+                .define("SQLCIPHER_CRYPTO_CC"),
+                .define("HAVE_USLEEP", to: "1"),
+                .define("SQLITE_MAX_VARIABLE_NUMBER", to: "99999"),
+                .define("SQLITE_EXTRA_INIT", to: "sqlcipher_extra_init"),
+                .define("SQLITE_EXTRA_SHUTDOWN", to: "sqlcipher_extra_shutdown"),
+            ]
         ),
         .target(name: "_GRDBDummy")
     ]
