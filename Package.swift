@@ -17,8 +17,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "GRDB",
-            url: "https://github.com/bamboocode/GRDB.swift/releases/download/0.3.5-sqlcipher/GRDB.xcframework.zip",
-            checksum: "78efcc298cd8befff595652062953b88ddf1365ff174a81fa121d507bd8380ae"
+            url: "https://github.com/bamboocode/GRDB.swift/releases/download/0.3.6-sqlcipher/GRDB.xcframework.zip",
+            checksum: "31a2036ce0c731f34184aee7777b2ea3bbacc1bbf2d78c8af806b4b8582b5a76"
         ),
         .target(
             name: "SQLCipher",
