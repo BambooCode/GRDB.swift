@@ -45,6 +45,8 @@ let package = Package(
                 .define("SQLITE_ENABLE_FTS5"),
                 .define("SQLITE_ENABLE_SNAPSHOT"),
                 .define("SQLCIPHER_CRYPTO_CC"),
+                .define("SQLITE_DEBUG", .when(configuration: .debug)),
+                .define("NDEBUG", .when(configuration: .release)),
                 .define("HAVE_USLEEP", to: "1"),
                 .define("SQLITE_MAX_VARIABLE_NUMBER", to: "99999"),
                 .define("SQLITE_EXTRA_INIT", to: "sqlcipher_extra_init"),
